@@ -1,9 +1,16 @@
-// NOTE: this example is not valid jasmin source code
+param int FF = 25;
+
+inline fn g<A>(stack u64 x) -> reg u64 {
+    reg u64 r;
+    r = x;
+    return r;
+}//<>
 
 inline fn bar<X,Y>(stack u64[X] x, stack u64[Y] y) -> reg u64 {
     reg u64 r;
     r = x[0];
     r += y[0];
+    r = g<X>(x[0]);
     return r;
 }//<>
 

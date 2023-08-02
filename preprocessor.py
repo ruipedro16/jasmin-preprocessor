@@ -46,21 +46,28 @@ def resolve_templates(text: str) -> str:
     # 5th step: Get a list of all the tasks that need to be done
     # First, we gather the tasks without handling nested calls, and then, after all
     # the tasks are collected, resolve the nested calls in the Task class.
+    # This needs to be done on the input_text instead of the already processed text
     tasks: list[Task] = utils.get_tasks(input_text, global_params)
     if DEBUG:
         print("Tasks [1st pass]:")
         pprint.pprint(tasks)
+
+    if DEBUG:
+        print("Searching for subtasks")
 
     for task in tasks:
         subtasks = task.get_sub_tasks(generic_fn_dict)
         tasks.extend(subtasks)
 
     if DEBUG:
-        print("Tasks [2nd pass]:")
+        print("Tasks [2nd pass (includes subtasks)]:")
         pprint.pprint(tasks)
 
+    # Remove duplicate tasks
+    tasks = list(set(tasks))
+
     if DEBUG:
-        print("Tasks [3rd pass]:")
+        print("Tasks [3rd pass (removes duplicate tasks)]:")
         pprint.pprint(tasks)
 
     # 6th step: Resolve each task
