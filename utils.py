@@ -112,8 +112,6 @@ def replace_generic_calls_with_concrete(
     return re.sub(pattern, replace_fn, text)
 
 
-
-
 def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
     """
     This function also replaces generic function calls with calls to the concrete functions
@@ -139,7 +137,7 @@ def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
         return f"{fn_name}_" + "_".join(concrete_args) + f"({generic_args})"
 
     text = re.sub(generic_fn_call_pattern, replace_fn, text)
-    return [ # We only return the tasks that can be solved right away. We look for subtasks later
+    return [  # We only return the tasks that can be solved right away. We look for subtasks later
         Task(fn_name, list(params), global_params)
         for fn_name, params in tasks
         if all(param.isdigit() for param in params)

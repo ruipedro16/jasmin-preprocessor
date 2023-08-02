@@ -69,6 +69,7 @@ class Task:
             text,
         )
 
+
 import re
 
 import utils
@@ -149,7 +150,7 @@ class Task:
         """
         Get the sub-tasks for the current task by resolving nested generic function calls.
         """
-        #print(f"Getting subtasks of {self.fn_name}")
+        # print(f"Getting subtasks of {self.fn_name}")
 
         subtasks = []
         generic_fn: GenericFn = generic_fn_dict[self.fn_name]

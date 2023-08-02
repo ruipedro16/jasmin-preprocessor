@@ -68,8 +68,21 @@ def resolve_templates(text: str) -> str:
         text = task.resolve(text, global_params, generic_fn_dict)
 
     # 7th step: Resolve generic function calls that were not resolved before
-    text = re.sub(r"(\w+)<([^>]+)>", lambda match: f"{match.group(1)}_{'_'.join(match.group(2).split(','))}", text)
-    
+    text = re.sub(
+        r"(\w+)<([^>]+)>",
+        lambda match: f"{match.group(1)}_{'_'.join(match.group(2).split(','))}",
+        text,
+    )
+
+    # Last step: Remove extra blank space & remove auxiliary comments
+    pattern = r"\n{3,}"
+    text = re.sub(pattern, "\n\n", text)
+
+    pattern = r"// Place concrete instances of the (\w+) function here"
+    text = re.sub(pattern, "", text)
+
+    text = text.strip()
+
     return text
 
 
