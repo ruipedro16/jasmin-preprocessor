@@ -10,10 +10,10 @@ def get_params(code: str) -> dict[str, int]:
     The code assumes that all parameter declarations follow the format
     'param int <parameter_name> = <expression>;'
     """
-    pattern = r"param\s+int\s+(\w+)\s+=\s+(.+);"
+    pattern = r"param\s+int\s+(\w+)\s*=\s*(.+);"
     matches = re.findall(pattern, code, re.MULTILINE)
-    param_dict = {name: value for name, value in matches}
-    res = {}
+    param_dict = dict(matches)
+    res: dict[str, int] = {}
     visited = set()
 
     def evaluate_expression(param_name: str):
