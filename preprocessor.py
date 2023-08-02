@@ -6,8 +6,6 @@ import re
 import sys
 import pprint
 
-from collections import OrderedDict
-
 import utils
 from generic_fn import GenericFn
 from task import Task
@@ -87,6 +85,8 @@ def resolve_templates(text: str) -> str:
 
     pattern = r"// Place concrete instances of the (\w+) function here"
     text = re.sub(pattern, "", text)
+    
+    # text = re.sub(r'^\s+fn', '', text)
 
     text = text.strip()
 

@@ -161,10 +161,13 @@ def build_concrete_fn(generic_fn: GenericFn, replacement_dict: dict[str, int]) -
         generic_fn (GenericFn): Information about the generic function
         replacement_dict (dict[str, int]): Map containing the value of each parameter to replace in the function
     """
-    res = ""
-
+    
     tmp = replace_parameters_in_string("_".join(generic_fn.params), replacement_dict)
-    res = f"{generic_fn.annotation} fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
+    
+    if generic_fn.annotation == '':
+        res = f"fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
+    else:
+        res = f"{generic_fn.annotation} fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
     res += replace_parameters_in_string(generic_fn.fn_body, replacement_dict)
     res += "}"
 

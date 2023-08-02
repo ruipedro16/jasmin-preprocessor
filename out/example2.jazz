@@ -1,14 +1,14 @@
 // NOTE: this example is not valid jasmin source code
 
 
-inline fn bar_2_3(stack u64[2] x, stack u64[3] y) -> reg u64 {
+inline fn bar_1_3(stack u64[1] x, stack u64[3] y) -> reg u64 {
     reg u64 r;
     r = x[0];
     r += y[0];
     return r;
 }
 
-inline fn bar_1_3(stack u64[1] x, stack u64[3] y) -> reg u64 {
+inline fn bar_2_3(stack u64[2] x, stack u64[3] y) -> reg u64 {
     reg u64 r;
     r = x[0];
     r += y[0];
