@@ -1,5 +1,9 @@
 # jasmin-preprocessor
 
+Run:
+
+> python3 processor.py <input_file>
+
 - `out`: Folder with preprocessed examples
 
 NOTE: Generic functions must end with `//<>`. E.g.
