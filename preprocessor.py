@@ -33,14 +33,13 @@ def resolve_templates(text: str) -> str:
     generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
 
     if DEBUG:
-        print("LOG: Generic Fn Dictionary:")
+        print("DEBUG: Generic Fn Dictionary:")
         pprint.pprint(generic_fn_dict)
 
     # 3rd step: Remove the code of the generic functions from the source code
     text = utils.remove_generic_fn_text(text)
 
     # 4th step: Replace calls to generic functions with calls to concrete functions
-    # NOTE: TODO: Doesnt work with nested function calls
     text = utils.replace_generic_calls_with_concrete(text, global_params)
 
     # 5th step: Get a list of all the tasks that need to be done
@@ -77,9 +76,10 @@ def resolve_templates(text: str) -> str:
     # 7th step: Resolve generic function calls that were not resolved before
     text = re.sub(
         r"(\w+)<([^>]+)>",
-        lambda match: f"{match.group(1)}_{'_'.join(match.group(2).split(','))}",
+        lambda match: f"{match.group(1)}_{'_'.join(str(global_params.get(p.strip(), p.strip())) for p in match.group(2).split(','))}",
         text,
     )
+
 
     # Last step: Remove extra blank space & remove auxiliary comments
     pattern = r"\n{3,}"

@@ -93,7 +93,7 @@ def replace_generic_calls_with_concrete(
     def replace_fn(match):
         fn_name, generic_params = match.groups()
         generic_params = [p.strip() for p in generic_params.split(",")]
-        concrete_params = {}
+        concrete_params: dict[str, int] = {}
 
         for param in generic_params:
             try:

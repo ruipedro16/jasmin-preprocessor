@@ -5,8 +5,6 @@ from generic_fn import GenericFn
 
 import pprint
 
-from typing import List
-
 
 class Task:
     """
@@ -74,7 +72,7 @@ class Task:
         generic_fn_dict: dict[str, GenericFn],
         context_params: dict[str, int] = None,
         resolved_params: dict[str, int] = None,
-    ) -> List["Task"]:
+    ) -> list["Task"]:
         """
         Get the sub-tasks for the current task by resolving nested generic function calls.
         """
@@ -119,9 +117,7 @@ class Task:
                     ### pprint.pprint(context_params)
 
                     # Context params may override global params
-                    context_params[param] = int(
-                        context_params[param]
-                    )  
+                    context_params[param] = int(context_params[param])
                 except KeyError:
                     context_params[param] = context_params.get(
                         param, self.global_params[param]
