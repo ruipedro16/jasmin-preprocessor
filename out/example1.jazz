@@ -1,7 +1,6 @@
 param int A = 1;
 param int B = A * 2;
 
-
 inline fn g_10_10(stack u64[10] a, reg ptr u64[10] b) -> reg u64 {
     reg u64 r;
     r = a[1];

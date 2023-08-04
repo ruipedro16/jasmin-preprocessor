@@ -78,16 +78,16 @@ def resolve_templates(text: str) -> str:
         text,
     )
 
-
     # Last step: Remove extra blank space & remove auxiliary comments
-    pattern = r"\n{3,}"
-    text = re.sub(pattern, "\n\n", text)
 
     pattern = r"// Place concrete instances of the (\w+) function here"
     text = re.sub(pattern, "", text)
-    
-    # text = re.sub(r'^\s+fn', '', text)
 
+    pattern = r"\n{3,}"
+    while re.search(pattern, text):
+        text = re.sub(pattern, "\n\n", text)
+
+    
     text = text.strip()
 
     return text
