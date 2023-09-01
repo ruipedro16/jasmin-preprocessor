@@ -13,7 +13,10 @@ from generic_fn import GenericFn
 from task import Task
 
 """
-Example: python3 preprocessor.py --parameters param1.txt param2.txt --source source1.txt source2.txt --output_file stdout
+Example: 
+    $ python3 preprocessor.py --input_file examples/sphincs+/_keccak1600.jinc --search_path examples/sphincs+/* --output_file out/_keccak1600.jinc
+
+search_path: Specifies the path to read files (both parameters & functions)
 """
 
 DEBUG: bool = False
@@ -23,18 +26,18 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
 
     parser.add_argument(
-        "--source",
-        nargs="+",
+        "--input_file",
         required=True,
-        help="List of source files",
+        help="Input file path",
         type=str,
     )
 
+    # This argument is optional. 
+    # It is not needed when all of the code is contained in a single file
     parser.add_argument(
-        "--parameters",
+        "--search_path",
         nargs="+",
-        required=False,
-        help="List of parameter files",
+        help="Path to read parameters & functions",
         type=str,
     )
 
@@ -126,24 +129,24 @@ def resolve_templates(
 if __name__ == "__main__":
     args = parse_args()
 
-    all_files = []
-    if args.parameters:
-        all_files.extend(args.parameters)
-    if args.source:
-        all_files.extend(args.source)
+    all_files = args.search_path # May be None because args.search_path is an optional argument
+    
+    if DEBUG:
+        print(f'All files: {", ".join(all_files)}')
 
     # Check if all files exist
-    for file in all_files:
-        if not os.path.exists(file):
-            sys.stderr.write(f"Error: The file '{file}' does not exist.\n")
-            sys.exit(-1)
+    if all_files:
+        for file in all_files:
+            if not os.path.exists(file):
+                sys.stderr.write(f"Error: The file '{file}' does not exist.\n")
+                sys.exit(-1)
 
     global_params: dict[str, int] = {}
     generic_fn_dict: dict[str, GenericFn] = {}
 
     # 1st step: Load global parameters from param files
-    if args.parameters:
-        for file in args.parameters:
+    if all_files:
+        for file in all_files:
             with open(file, "r") as f:
                 text: str = f.read()
             tmp: dict[str, int] = utils.get_params(text)
@@ -153,8 +156,8 @@ if __name__ == "__main__":
         print("DEBUG: Global Param Dictionary")
         pprint.pprint(global_params)
 
-    if args.source:
-        for file in args.source:
+    if all_files:
+        for file in all_files:
             with open(file, "r") as f:
                 text: str = f.read()
             tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
@@ -163,10 +166,8 @@ if __name__ == "__main__":
     if DEBUG:
         print("DEBUG: Generic Fn Dictionary:")
         pprint.pprint(generic_fn_dict.keys())
-        
-    # exit(0)
 
-    input_file: str = args.source[0]
+    input_file: str = args.input_file
 
     with open(input_file, "r") as f:
         input_text: str = f.read()
