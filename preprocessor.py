@@ -6,33 +6,64 @@ import re
 import sys
 import pprint
 
+import argparse
+
 import utils
 from generic_fn import GenericFn
 from task import Task
 
+"""
+Example: python3 preprocessor.py --parameters param1.txt param2.txt --source source1.txt source2.txt --output_file stdout
+"""
+
 DEBUG: bool = False
 
 
-def resolve_templates(text: str) -> str:
+def parse_args():
+    parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
+
+    parser.add_argument(
+        "--source",
+        nargs="+",
+        required=True,
+        help="List of source files",
+        type=str,
+    )
+
+    parser.add_argument(
+        "--parameters",
+        nargs="+",
+        required=False,
+        help="List of parameter files",
+        type=str,
+    )
+
+    parser.add_argument(
+        "--output_file",
+        required=True,
+        help="Output file path",
+        type=str,
+    )
+
+    return parser.parse_args()
+
+
+def resolve_templates(
+    text: str, global_params: dict[str, int], generic_fn_dict: dict[str, GenericFn]
+) -> str:
     """
     Resolves templates in the source code.
     The code assumes that all template declarations follow the format
     '[inline] fn <function_name><template_params>(<parameters>) -> <return_type> { <function_body> } // <>'
     """
+    # 1st step: Update global params dict. The source file may define new `param int` variables or override previously
+    #           defined ones
+    tmp: dict[str, int] = utils.get_params(text)
+    global_params.update(tmp)
 
-    # 1st Step: Evaluate the global parameters
-    global_params: dict[str, int] = utils.get_params(text)
-
-    if DEBUG:
-        print("DEBUG: Global Param Dictionary")
-        pprint.pprint(global_params)
-
-    # 2nd step: Identify generic functions from Jasmin source code
-    generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
-
-    if DEBUG:
-        print("DEBUG: Generic Fn Dictionary:")
-        pprint.pprint(generic_fn_dict)
+    # 2nd step: Update generic functions dict from Jasmin source code
+    tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
+    generic_fn_dict.update(tmp)
 
     # 3rd step: Remove the code of the generic functions from the source code
     text = utils.remove_generic_fn_text(text)
@@ -87,28 +118,64 @@ def resolve_templates(text: str) -> str:
     while re.search(pattern, text):
         text = re.sub(pattern, "\n\n", text)
 
-    
     text = text.strip()
 
     return text
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        sys.stderr.write(f"Usage: {sys.argv[0]} <input_file>\n")
-        sys.exit(-1)
+    args = parse_args()
 
-    input_file: str = sys.argv[1]
+    all_files = []
+    if args.parameters:
+        all_files.extend(args.parameters)
+    if args.source:
+        all_files.extend(args.source)
 
-    if not os.path.exists(input_file):
-        sys.stderr.write(f"Error: The file '{input_file}' does not exist.\n")
-        sys.exit(-1)
+    # Check if all files exist
+    for file in all_files:
+        if not os.path.exists(file):
+            sys.stderr.write(f"Error: The file '{file}' does not exist.\n")
+            sys.exit(-1)
+
+    global_params: dict[str, int] = {}
+    generic_fn_dict: dict[str, GenericFn] = {}
+
+    # 1st step: Load global parameters from param files
+    if args.parameters:
+        for file in args.parameters:
+            with open(file, "r") as f:
+                text: str = f.read()
+            tmp: dict[str, int] = utils.get_params(text)
+            global_params.update(tmp)
+
+    if DEBUG:
+        print("DEBUG: Global Param Dictionary")
+        pprint.pprint(global_params)
+
+    if args.source:
+        for file in args.source:
+            with open(file, "r") as f:
+                text: str = f.read()
+            tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
+            generic_fn_dict.update(tmp)
+
+    if DEBUG:
+        print("DEBUG: Generic Fn Dictionary:")
+        pprint.pprint(generic_fn_dict.keys())
+        
+    # exit(0)
+
+    input_file: str = args.source[0]
 
     with open(input_file, "r") as f:
         input_text: str = f.read()
 
-    output_text: str = resolve_templates(input_text)
+    output_text: str = resolve_templates(input_text, global_params, generic_fn_dict)
+    output_text += "\n"
 
     if DEBUG:
         print("\n--------------------------------------------------------------\n")
-    print(output_text)
+
+    with open(args.output_file, "w") as f:
+        f.write(output_text)

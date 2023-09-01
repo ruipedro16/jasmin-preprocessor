@@ -1,4 +1,5 @@
 import re
+import sys
 
 import utils
 from generic_fn import GenericFn
@@ -53,7 +54,16 @@ class Task:
         Resolve the function and return the concrete definition
         """
         pattern = rf"// Place concrete instances of the {self.fn_name} function here"
-        generic_fn: GenericFn = generic_fn_dict[self.fn_name]
+
+        generic_fn: GenericFn = None
+        try:
+            generic_fn = generic_fn_dict[self.fn_name]
+        except KeyError:
+            sys.stderr.write(
+                f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve"
+            )
+            sys.exit(-1)
+
         replacement_dict: dict[str, int] = dict(
             zip(generic_fn.params, self.template_params)
         )
@@ -79,7 +89,15 @@ class Task:
         ### print(f"\n\nGetting subtasks of {self.fn_name}")
 
         subtasks: list[Task] = []
-        generic_fn: GenericFn = generic_fn_dict[self.fn_name]
+        
+        generic_fn: GenericFn = None
+        try:
+            generic_fn = generic_fn_dict[self.fn_name]
+        except KeyError:
+            sys.stderr.write(
+                f"Could not find {self.fn_name} in generic_fn_dict in Task.get_sub_tasks"
+            )
+            sys.exit(-1)
 
         resolved_fn_body: str = self.resolve(
             generic_fn.fn_body, self.global_params, generic_fn_dict

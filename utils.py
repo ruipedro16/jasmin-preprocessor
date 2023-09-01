@@ -14,7 +14,7 @@ def get_params(code: str) -> dict[str, int]:
     matches = re.findall(pattern, code, re.MULTILINE)
     param_dict = dict(matches)
     res: dict[str, int] = {}
-    visited = set()
+    visited: set[str] = set()
 
     def evaluate_expression(param_name: str):
         if param_name in visited:
@@ -22,13 +22,7 @@ def get_params(code: str) -> dict[str, int]:
 
         visited.add(param_name)
         param_value = param_dict[param_name]
-
-        try:
-            res[param_name] = int(param_value)
-        except ValueError:
-            evaluated_value = eval(param_value, None, res)
-            res[param_name] = evaluated_value
-
+        res[param_name] = eval(param_value, None, res)
         visited.remove(param_name)
 
     for key in param_dict:
@@ -44,13 +38,11 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"(\w*)\s+?fn\s+(\w+)<([\w, ]+)>\s*\(([^\)]+)\)([^}]*)\s*([^}]*)\s*}//<>"
+    pattern = r"(\w*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
-            # print("Match:")
-            # print(match.groups())
-            annotation, fn_name, params, args, fn_body, _ = match.groups()
+            annotation, fn_name, params, args, fn_body = match.groups()
             generic_fn = GenericFn(annotation, fn_name, params, args, fn_body)
             res[fn_name] = generic_fn
 
@@ -63,11 +55,11 @@ def remove_generic_fn_text(input_text: str) -> str:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"(\w*)\s+?fn\s+(\w+)<([\w, ]+)>\s*\(([^\)]+)\)([^}]*)\s*([^}]*)\s*}//<>"
+    pattern = r"(\w*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
-            _, fn_name, _, _, _, _ = match.groups()
+            _, fn_name, _, _, _ = match.groups()
             input_text = re.sub(
                 pattern,
                 f"\n\n// Place concrete instances of the {fn_name} function here",
@@ -161,10 +153,10 @@ def build_concrete_fn(generic_fn: GenericFn, replacement_dict: dict[str, int]) -
         generic_fn (GenericFn): Information about the generic function
         replacement_dict (dict[str, int]): Map containing the value of each parameter to replace in the function
     """
-    
+
     tmp = replace_parameters_in_string("_".join(generic_fn.params), replacement_dict)
-    
-    if generic_fn.annotation == '':
+
+    if generic_fn.annotation == "":
         res = f"fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
     else:
         res = f"{generic_fn.annotation} fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
