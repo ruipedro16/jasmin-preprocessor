@@ -20,12 +20,14 @@ class GenericFn:
         params: str,
         args: str,
         fn_body: str,
+        file_path: str,
     ):
         self.annotation = annotation
         self.fn_name = fn_name
         self.params = [p.strip() for p in params.split(",")]
         self.args = args
         self.fn_body = fn_body
+        self.file_path = file_path
 
     def __repr__(self) -> str:
         return (
@@ -33,5 +35,6 @@ class GenericFn:
             f"Function Name: {self.fn_name}\n"
             f"Parameters: {self.params}\n"
             f"Arguments: {self.args}\n"
-            f"Function Body:\n{self.fn_body}"
+            f"Function Body:\n{self.fn_body}\n\n"
+            f"File Path: {self.file_path}"
         )

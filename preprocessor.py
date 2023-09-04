@@ -25,6 +25,8 @@ DEBUG: bool = False
 def parse_args():
     parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
 
+    # Input file to process
+    # The preprocessor only processes one file at a time
     parser.add_argument(
         "--input_file",
         required=True,
@@ -32,7 +34,7 @@ def parse_args():
         type=str,
     )
 
-    # This argument is optional. 
+    # This argument is optional.
     # It is not needed when all of the code is contained in a single file
     parser.add_argument(
         "--search_path",
@@ -57,7 +59,7 @@ def resolve_templates(
     """
     Resolves templates in the source code.
     The code assumes that all template declarations follow the format
-    '[inline] fn <function_name><template_params>(<parameters>) -> <return_type> { <function_body> } // <>'
+    '[inline] fn <function_name><template_params>(<parameters>) -> <return_type> { <function_body> } //<>'
     """
     # 1st step: Update global params dict. The source file may define new `param int` variables or override previously
     #           defined ones
@@ -129,9 +131,11 @@ def resolve_templates(
 if __name__ == "__main__":
     args = parse_args()
 
-    all_files = args.search_path # May be None because args.search_path is an optional argument
-    
-    if DEBUG:
+    all_files = (
+        args.search_path
+    )  # May be None because args.search_path is an optional argument
+
+    if all_files and DEBUG:
         print(f'All files: {", ".join(all_files)}')
 
     # Check if all files exist
