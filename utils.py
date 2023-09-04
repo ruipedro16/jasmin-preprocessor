@@ -31,7 +31,7 @@ def get_params(code: str) -> dict[str, int]:
     return res
 
 
-def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
+def get_generic_fn_dict(input_text: str, filepath: str) -> dict[str, GenericFn]:
     """
     Extracts generic function declarations from the input text and returns a dictionary
     containing information about each generic function.
@@ -43,7 +43,7 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
             annotation, fn_name, params, args, fn_body = match.groups()
-            generic_fn = GenericFn(annotation, fn_name, params, args, fn_body)
+            generic_fn = GenericFn(annotation, fn_name, params, args, fn_body, filepath)
             res[fn_name] = generic_fn
 
     return res
