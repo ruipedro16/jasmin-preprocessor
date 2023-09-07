@@ -1,30 +1,21 @@
-param int FF = 15;
-
-fn f_xyz_15(stack u64 x) -> reg 64 {
+#[returnaddress="stack"]
+fn f_xyz_2(stack u64 x) -> reg 64 {
     return x;
 }
 
-fn f_xyz_15(stack u64 x) -> reg 64 {
+fn f_xyz_1(stack u64 x) -> reg 64 {
     return x;
-}
-
-inline fn g_2(stack u64 x) -> reg u64 {
-    reg u64 r;
-    r = f_xyz_15(x);
-    return r;
 }
 
 inline fn g_1(stack u64 x) -> reg u64 {
     reg u64 r;
-    r = f_xyz_15(x);
+    r = f_xyz_1(x);
     return r;
 }
 
-inline fn bar_1_3(stack u64[1] x, stack u64[3] y) -> reg u64 {
+inline fn g_2(stack u64 x) -> reg u64 {
     reg u64 r;
-    r = x[0];
-    r += y[0];
-    r = g_1(x[0]);
+    r = f_xyz_2(x);
     return r;
 }
 
@@ -33,6 +24,14 @@ inline fn bar_2_3(stack u64[2] x, stack u64[3] y) -> reg u64 {
     r = x[0];
     r += y[0];
     r = g_2(x[0]);
+    return r;
+}
+
+inline fn bar_1_3(stack u64[1] x, stack u64[3] y) -> reg u64 {
+    reg u64 r;
+    r = x[0];
+    r += y[0];
+    r = g_1(x[0]);
     return r;
 }
 

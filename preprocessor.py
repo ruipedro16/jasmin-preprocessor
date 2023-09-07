@@ -36,6 +36,7 @@ def parse_args():
 
     # This argument is optional.
     # It is not needed when all of the code is contained in a single file
+    # TODO: this is not implemented yet
     parser.add_argument(
         "--search_path",
         nargs="+",

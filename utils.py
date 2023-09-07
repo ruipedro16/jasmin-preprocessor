@@ -38,12 +38,13 @@ def get_generic_fn_dict(input_text: str, filepath: str) -> dict[str, GenericFn]:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"(\w*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    pattern = r"(#\[.+\]\n)?(\w*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
-            annotation, fn_name, params, args, fn_body = match.groups()
-            generic_fn = GenericFn(annotation, fn_name, params, args, fn_body, filepath)
+            ret_address, annotation, fn_name, params, args, fn_body = match.groups()
+            tmp = ret_address + annotation if ret_address is not None else annotation
+            generic_fn = GenericFn(tmp, fn_name, params, args, fn_body, filepath)
             res[fn_name] = generic_fn
 
     return res
