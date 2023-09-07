@@ -25,8 +25,6 @@ DEBUG: bool = False
 def parse_args():
     parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
 
-    # Input file to process
-    # The preprocessor only processes one file at a time
     parser.add_argument(
         "--input_file",
         required=True,
@@ -34,9 +32,6 @@ def parse_args():
         type=str,
     )
 
-    # This argument is optional.
-    # It is not needed when all of the code is contained in a single file
-    # TODO: this is not implemented yet
     parser.add_argument(
         "--search_path",
         nargs="+",
@@ -71,7 +66,7 @@ def resolve_templates(
     global_params.update(tmp)
 
     # 2nd step: Update generic functions dict from Jasmin source code
-    tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text, filepath)
+    tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
     generic_fn_dict.update(tmp)
 
     # 3rd step: Remove the code of the generic functions from the source code
@@ -176,7 +171,7 @@ if __name__ == "__main__":
         for file in all_files:
             with open(file, "r") as f:
                 text: str = f.read()
-            tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text, file)
+            tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
             generic_fn_dict.update(tmp)
 
     if DEBUG:

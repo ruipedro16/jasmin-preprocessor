@@ -31,20 +31,24 @@ def get_params(code: str) -> dict[str, int]:
     return res
 
 
-def get_generic_fn_dict(input_text: str, filepath: str) -> dict[str, GenericFn]:
+def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     """
     Extracts generic function declarations from the input text and returns a dictionary
     containing information about each generic function.
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"(#\[.+\]\n)?(\w*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    pattern = r"([#\[\]\"=\w\s]*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
-            ret_address, annotation, fn_name, params, args, fn_body = match.groups()
-            tmp = ret_address + annotation if ret_address is not None else annotation
-            generic_fn = GenericFn(tmp, fn_name, params, args, fn_body, filepath)
+            annotation, fn_name, params, args, fn_body = match.groups()
+
+            annotation = annotation.strip()
+            if "#" in annotation:
+                annotation += "\n"
+
+            generic_fn = GenericFn(annotation, fn_name, params, args, fn_body)
             res[fn_name] = generic_fn
 
     return res
@@ -56,17 +60,24 @@ def remove_generic_fn_text(input_text: str) -> str:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"(\w*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    pattern = r"([#\[\]\"=\w\s]*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
-    if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
-        for match in matches:
-            _, fn_name, _, _, _ = match.groups()
-            input_text = re.sub(
-                pattern,
-                f"\n\n// Place concrete instances of the {fn_name} function here",
-                input_text,
-                count=1,
-            )
+    matches = re.finditer(pattern, input_text, flags=re.MULTILINE)
+
+    replacements = []
+
+    for match in matches:
+        _, fn_name, _, _, _ = match.groups()
+        replacement_text = (
+            f"\n\n// Place concrete instances of the {fn_name} function here"
+        )
+        replacements.append((match.start(), match.end(), replacement_text))
+
+    # Sort the replacements in reverse order to ensure that replacing text doesn't affect other replacements
+    replacements.sort(reverse=True)
+
+    for start, end, replacement_text in replacements:
+        input_text = input_text[:start] + replacement_text + input_text[end:]
 
     return input_text
 
@@ -159,6 +170,8 @@ def build_concrete_fn(generic_fn: GenericFn, replacement_dict: dict[str, int]) -
 
     if generic_fn.annotation == "":
         res = f"fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
+    elif "#" in generic_fn.annotation:
+        res = f"{generic_fn.annotation}fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
     else:
         res = f"{generic_fn.annotation} fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
     res += replace_parameters_in_string(generic_fn.fn_body, replacement_dict)

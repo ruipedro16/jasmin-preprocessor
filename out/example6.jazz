@@ -3,19 +3,20 @@ fn f_xyz_2(stack u64 x) -> reg 64 {
     return x;
 }
 
+#[returnaddress="stack"]
 fn f_xyz_1(stack u64 x) -> reg 64 {
     return x;
-}
-
-inline fn g_1(stack u64 x) -> reg u64 {
-    reg u64 r;
-    r = f_xyz_1(x);
-    return r;
 }
 
 inline fn g_2(stack u64 x) -> reg u64 {
     reg u64 r;
     r = f_xyz_2(x);
+    return r;
+}
+
+inline fn g_1(stack u64 x) -> reg u64 {
+    reg u64 r;
+    r = f_xyz_1(x);
     return r;
 }
 
