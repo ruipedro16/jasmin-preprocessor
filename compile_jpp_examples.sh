@@ -7,7 +7,7 @@ mkdir -p jpp_examples/jazz
 
 for file in jpp_examples/*.jpp; do
     filename=$(basename "$file" .jpp)
-    ./preprocessor -d --input_file $file --output_file "jpp_examples/jazz/$filename.jazz"
+    ./preprocessor --input_file $file --output_file "jpp_examples/jazz/$filename.jazz"
 done
 
 for file in jpp_examples/jazz/*; do
