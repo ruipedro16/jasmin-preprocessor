@@ -1,3 +1,6 @@
+//param int 32 = 32;
+//param int 128 = 64;
+
 param int KECCAK_ROUNDS = 24;
 
 u64[24] KECCAK1600_RC =
@@ -27,14 +30,12 @@ u64[24] KECCAK1600_RC =
   ,0x8000000080008008
 };
 
-
 inline fn __index(inline int x y) -> inline int
 {
   inline int r;
   r = (x % 5) + 5 * (y % 5);
   return r;
 }
-
 
 inline fn __keccak_rho_offsets(inline int i) -> inline int
 {
@@ -54,7 +55,6 @@ inline fn __keccak_rho_offsets(inline int i) -> inline int
 
   return r;
 }
-
 
 inline fn __rhotates(inline int x y) -> inline int
 {
@@ -85,7 +85,6 @@ inline fn __theta_sum(reg ptr u64[25] a) -> reg u64[5]
   return c;
 }
 
-
 // D[x] = C[x-1] ^ ROT(C[x+1], 1) 
 inline fn __theta_rol(reg u64[5] c) -> reg u64[5]
 {
@@ -105,7 +104,6 @@ inline fn __theta_rol(reg u64[5] c) -> reg u64[5]
 
   return d;
 }
-
 
 // B[x] = ROT( (A[x',y'] ^ D[x']), r[x',y'] ) with (x',y') = M^-1 (x,y)
 //
@@ -142,7 +140,6 @@ inline fn __rol_sum(
   return b;
 }
 
-
 // E[x, y] = B[x] ^ ( (!B[x+1]) & B[x+2] )
 // -- when x and y are 0: E[0,0] ^= RC[i];
 inline fn __set_row(
@@ -170,7 +167,6 @@ inline fn __set_row(
   return e;
 }
 
-
 inline fn __round(reg ptr u64[25] e a, stack u64 s_rc) -> reg ptr u64[25]
 {
   inline int y;
@@ -186,7 +182,6 @@ inline fn __round(reg ptr u64[25] e a, stack u64 s_rc) -> reg ptr u64[25]
 
   return e;
 }
-
 
 inline fn __keccakf1600(reg ptr u64[25] a) -> reg ptr u64[25]
 {
@@ -223,14 +218,12 @@ inline fn __keccakf1600(reg ptr u64[25] a) -> reg ptr u64[25]
   return a;
 }
 
-
 #[returnaddress="stack"]
 fn _keccakf1600(reg ptr u64[25] a) -> reg ptr u64[25]
 {
   a = __keccakf1600(a);
   return a;
 }
-
 
 inline fn _keccakf1600_(reg ptr u64[25] a) -> reg ptr u64[25]
 {
@@ -239,7 +232,6 @@ inline fn _keccakf1600_(reg ptr u64[25] a) -> reg ptr u64[25]
   a = a;
   return a;
 }
-
 
 inline fn __keccak_init(reg ptr u64[25] state) -> reg ptr u64[25]
 {
@@ -253,9 +245,9 @@ inline fn __keccak_init(reg ptr u64[25] state) -> reg ptr u64[25]
   return state;
 }
 
-inline fn __add_full_block<INLEN>(
+inline fn __add_full_block_128(
   reg ptr u64[25] state,
-  reg ptr u8[INLEN] in,
+  reg ptr u8[128] in,
   reg u64 offset,
   reg u64 rate
 ) -> reg ptr u64[25], reg u64
@@ -274,11 +266,11 @@ inline fn __add_full_block<INLEN>(
   }
 
   return state, offset;
-}//<>
+}
 
-inline fn __add_final_block<INLEN>(
+inline fn __add_final_block_128(
   reg ptr u64[25] state,
-  reg ptr u8[INLEN] in,
+  reg ptr u8[128] in,
   reg u64 offset,
   reg u8 trail_byte,
   reg u64 rate
@@ -289,7 +281,7 @@ inline fn __add_final_block<INLEN>(
 
   t = offset;
   t <<= 3;
-  inlen64 = INLEN;
+  inlen64 = 128;
   inlen64 -= t;
   inlen64 >>= 3;
   i = 0;
@@ -303,7 +295,7 @@ inline fn __add_final_block<INLEN>(
 
   offset <<= 3;
   i <<= 3;
-  inlen8 = INLEN;
+  inlen8 = 128;
   inlen8 -= offset;
   while ( i < inlen8 )
   {
@@ -320,11 +312,11 @@ inline fn __add_final_block<INLEN>(
   state[u8 (int)i] ^= 0x80;
 
   return state;
-}//<>
+}
 
-inline fn __absorb<INLEN>(
+inline fn __absorb_128(
   reg ptr u64[25] state,
-  reg ptr u8[INLEN] in,
+  reg ptr u8[128] in,
   reg u64 offset,
   stack u8 s_trail_byte,
   reg u64 rate // rate already in bytes -- it is returned bc of spills
@@ -332,17 +324,17 @@ inline fn __absorb<INLEN>(
 {
   reg u64 inlen;
   stack u64 s_inlen s_offset s_rate;
-  stack ptr u8[INLEN] s_in;
+  stack ptr u8[128] s_in;
   reg u8 trail_byte;
   reg u64 t;
 
   // intermediate blocks
-  inlen = INLEN;
+  inlen = 128;
   while ( inlen >= rate )
   {
     inlen -= rate;
 
-    state, offset = __add_full_block<INLEN>(state, in, offset, rate);
+    state, offset = __add_full_block_64(state, in, offset, rate);
 
     s_in = in;
     s_inlen = inlen; 
@@ -360,18 +352,17 @@ inline fn __absorb<INLEN>(
   // final block
   trail_byte = s_trail_byte;
 
-  state = __add_final_block<INLEN>(state, in, offset, trail_byte, rate);
+  state = __add_final_block_64(state, in, offset, trail_byte, rate);
 
   return state, rate;
-}//<>
+}
 
-
-inline fn __xtr_full_block<OUTLEN>(
+inline fn __xtr_full_block_32(
   reg ptr u64[25] state,
-  reg ptr u8[OUTLEN] out,
+  reg ptr u8[32] out,
   reg u64 offset,
   reg u64 rate
-) -> reg ptr u8[OUTLEN], reg u64
+) -> reg ptr u8[32], reg u64
 {
   reg u64 i t rate64;
 
@@ -387,21 +378,20 @@ inline fn __xtr_full_block<OUTLEN>(
   }
 
   return out, offset;
-}//<>
+}
 
-
-inline fn __xtr_bytes<OUTLEN>(
+inline fn __xtr_bytes_32(
   reg ptr u64[25] state,
-  reg ptr u8[OUTLEN] out,
+  reg ptr u8[32] out,
   reg u64 offset
-) -> reg ptr u8[OUTLEN], reg u64
+) -> reg ptr u8[32], reg u64
 {
   reg u64 i t outlen64 outlen8;
   reg u8 c;
 
   t = offset;
   t <<= 3;
-  outlen64 = OUTLEN;
+  outlen64 = 32;
   outlen64 -= t;
   outlen64 >>= 3;
   i = 0;
@@ -415,7 +405,7 @@ inline fn __xtr_bytes<OUTLEN>(
 
   offset <<= 3;
   i <<= 3;
-  outlen8 = OUTLEN;
+  outlen8 = 32;
   outlen8 -= offset;
   while ( i < outlen8 )
   {
@@ -426,22 +416,21 @@ inline fn __xtr_bytes<OUTLEN>(
   }
 
   return out, offset;
-}//<>
+}
 
-
-inline fn __squeeze<OUTLEN>(
+inline fn __squeeze_32(
   reg mut ptr u64[25] state,
-  reg ptr u8[OUTLEN] out,
+  reg ptr u8[32] out,
   reg u64 offset,
   reg u64 rate
-) -> reg ptr u8[OUTLEN], reg u64
+) -> reg ptr u8[32], reg u64
 {
   reg u64 outlen;
-  stack ptr u8[OUTLEN] s_out;
+  stack ptr u8[32] s_out;
   stack u64 s_outlen s_offset s_rate;
 
   // intermediate blocks
-  outlen = OUTLEN;
+  outlen = 32;
   while ( outlen > rate )
   {
     outlen -= rate;
@@ -458,7 +447,7 @@ inline fn __squeeze<OUTLEN>(
     outlen = s_outlen;
     rate = s_rate;
 
-    out, offset = __xtr_full_block<OUTLEN>(state, out, offset, rate);
+    out, offset = __xtr_full_block_32(state, out, offset, rate);
   }
 
   s_out = out;
@@ -469,24 +458,23 @@ inline fn __squeeze<OUTLEN>(
   out = s_out;
   offset = s_offset;
 
-  out, offset = __xtr_bytes<OUTLEN>(state, out, offset);
+  out, offset = __xtr_bytes_32(state, out, offset);
 
   return out, offset;
-}//<>
+}
 
-
-inline fn __keccak1600<OUTLEN,INLEN>(
-  reg ptr u8[OUTLEN] out,
-  reg ptr u8[INLEN] in,
+inline fn __keccak1600_32_128(
+  reg ptr u8[32] out,
+  reg ptr u8[128] in,
   reg u8 trail_byte,
   reg u64 rate)
   ->
-  reg ptr u8[OUTLEN]
+  reg ptr u8[32]
 {
   stack u64[25] _state;
   reg ptr u64[25] state;
 
-  stack ptr u8[OUTLEN] s_out;
+  stack ptr u8[32] s_out;
   stack u8 s_trail_byte;
   reg u64 offset;
 
@@ -498,55 +486,52 @@ inline fn __keccak1600<OUTLEN,INLEN>(
 
   // absorb
   offset = 0;
-  state, rate = __absorb<INLEN>(state, in, offset, s_trail_byte, rate);
+  state, rate = __absorb_64(state, in, offset, s_trail_byte, rate);
 
   // squeeze
   out = s_out;
   offset = 0;
-  out, _ = __squeeze<OUTLEN>(state, out, offset, rate);
+  out, _ = __squeeze_32(state, out, offset, rate);
   return out;
-}//<>
-
+}
 
 #[returnaddress="stack"]
-fn _keccak1600<OUTLEN,INLEN>(
-  reg ptr u8[OUTLEN] out,
-  reg ptr u8[INLEN] in,
+fn _keccak1600_32_128(
+  reg ptr u8[32] out,
+  reg ptr u8[128] in,
   reg u8 trail_byte,
   reg u64 rate)
   ->
-  reg ptr u8[OUTLEN]
+  reg ptr u8[32]
 {
-  out = __keccak1600<OUTLEN,INLEN>(out, in, trail_byte, rate);
+  out = __keccak1600_32_64(out, in, trail_byte, rate);
   return out;
-}//<>
+}
 
-
-inline fn _keccak1600_<OUTLEN,INLEN>(
-  reg ptr u8[OUTLEN] out,
-  reg ptr u8[INLEN] in,
+inline fn _keccak1600__32_128(
+  reg ptr u8[32] out,
+  reg ptr u8[128] in,
   reg u8 trail_byte,
   reg u64 rate)
   ->
-  reg ptr u8[OUTLEN]
+  reg ptr u8[32]
 {
   out = out;
   in = in;
   trail_byte = trail_byte;
   rate = rate;
 
-  out = _keccak1600<OUTLEN,INLEN>(out, in, trail_byte, rate);
+  out = _keccak1600_32_64(out, in, trail_byte, rate);
 
   out = out;
   return out;
-}//<>
+}
 
-
-inline fn __shake256<OUTLEN,INLEN>(
-  reg ptr u8[OUTLEN] out,
-  reg ptr u8[INLEN] in)
+inline fn __shake256_32_128(
+  reg ptr u8[32] out,
+  reg ptr u8[128] in)
   -> 
-  reg ptr u8[OUTLEN]
+  reg ptr u8[32]
 {
   reg u64 rate;
   reg u8 trail_byte;
@@ -554,24 +539,23 @@ inline fn __shake256<OUTLEN,INLEN>(
   trail_byte = 0x1F;
   rate = (1088/8);
 
-  out = _keccak1600_<OUTLEN,INLEN>(out, in, trail_byte, rate);
+  out = _keccak1600__32_64(out, in, trail_byte, rate);
 
   return out;
-}//<>
-
+}
 
 export fn test_shake256(reg u64 _out _in)
 {
   stack u8[32] out;
-  stack u8[64] in;
+  stack u8[128] in;
   reg ptr u8[32] out_p;
-  reg ptr u8[64] in_p;
+  reg ptr u8[128] in_p;
 
   reg u8 t;
   reg u64 i;
 
   i = 0;
-  while(i < 64)
+  while(i < 128)
   { t = (u8)[_in + i];
     in[(int)i] = t;
     i += 1;
@@ -580,7 +564,7 @@ export fn test_shake256(reg u64 _out _in)
   out_p = out;
   in_p = in;
 
-  out_p = __shake256<32,64>(out_p, in_p);
+  out_p = __shake256_32_128(out_p, in_p);
 
   out = out_p;
 
@@ -591,4 +575,3 @@ export fn test_shake256(reg u64 _out _in)
     i += 1;
   }
 }
-

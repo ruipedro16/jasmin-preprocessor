@@ -1,6 +1,3 @@
-//param int 32 = 32;
-//param int 2208 = 64;
-
 param int KECCAK_ROUNDS = 24;
 
 u64[24] KECCAK1600_RC =
@@ -266,7 +263,7 @@ inline fn __add_full_block_2208(
   }
 
   return state, offset;
-}//<>
+}
 
 inline fn __add_final_block_2208(
   reg ptr u64[25] state,
@@ -312,7 +309,7 @@ inline fn __add_final_block_2208(
   state[u8 (int)i] ^= 0x80;
 
   return state;
-}//<>
+}
 
 inline fn __absorb_2208(
   reg ptr u64[25] state,
@@ -355,7 +352,7 @@ inline fn __absorb_2208(
   state = __add_final_block_2208(state, in, offset, trail_byte, rate);
 
   return state, rate;
-}//<>
+}
 
 inline fn __xtr_full_block_32(
   reg ptr u64[25] state,
@@ -378,7 +375,7 @@ inline fn __xtr_full_block_32(
   }
 
   return out, offset;
-}//<>
+}
 
 inline fn __xtr_bytes_32(
   reg ptr u64[25] state,
@@ -416,7 +413,7 @@ inline fn __xtr_bytes_32(
   }
 
   return out, offset;
-}//<>
+}
 
 inline fn __squeeze_32(
   reg mut ptr u64[25] state,
@@ -461,7 +458,7 @@ inline fn __squeeze_32(
   out, offset = __xtr_bytes_32(state, out, offset);
 
   return out, offset;
-}//<>
+}
 
 inline fn __keccak1600_32_2208(
   reg ptr u8[32] out,
@@ -493,7 +490,7 @@ inline fn __keccak1600_32_2208(
   offset = 0;
   out, _ = __squeeze_32(state, out, offset, rate);
   return out;
-}//<>
+}
 
 #[returnaddress="stack"]
 fn _keccak1600_32_2208(
@@ -506,7 +503,7 @@ fn _keccak1600_32_2208(
 {
   out = __keccak1600_32_2208(out, in, trail_byte, rate);
   return out;
-}//<>
+}
 
 inline fn _keccak1600__32_2208(
   reg ptr u8[32] out,
@@ -525,7 +522,7 @@ inline fn _keccak1600__32_2208(
 
   out = out;
   return out;
-}//<>
+}
 
 inline fn __shake256_32_2208(
   reg ptr u8[32] out,
@@ -542,7 +539,7 @@ inline fn __shake256_32_2208(
   out = _keccak1600__32_2208(out, in, trail_byte, rate);
 
   return out;
-}//<>
+}
 
 export fn test_shake256(reg u64 _out _in)
 {
