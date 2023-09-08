@@ -2,11 +2,11 @@
 
 Run:
 
-> python3 processor.py <input_file>
+> $ ./preprocessor [-d] --input_file <input_file> --output_file <output_file>
 
-- `out`: Folder with preprocessed examples
+- [Shake256 examples](jpp_examples)
 
-NOTE: Generic functions must be written in files with the extension `jtmpl` and must end with `//<>`. E.g.
+**NOTE:** Generic functions must end with `//<>`. E.g.
 
 ```
 inline fn g<A,B>(stack u64[A] a, reg ptr u64[B] b) -> reg u64 {
