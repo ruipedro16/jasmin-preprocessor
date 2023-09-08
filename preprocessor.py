@@ -13,13 +13,8 @@ from generic_fn import GenericFn
 from task import Task
 
 """
-Example: 
-    $ python3 preprocessor.py --input_file examples/sphincs+/_keccak1600.jinc --search_path examples/sphincs+/* --output_file out/_keccak1600.jinc
-
-search_path: Specifies the path to read files (both parameters & functions)
+$ python3 preprocessor.py --input_file <input_file> --output_file <output_file>
 """
-
-DEBUG: bool = False
 
 
 def parse_args():
@@ -46,6 +41,13 @@ def parse_args():
         type=str,
     )
 
+    parser.add_argument(
+        "-d",
+        "--debug",
+        help="Enable debugging",
+        action="store_true",  # Makes -d a flag without an argument
+    )
+
     return parser.parse_args()
 
 
@@ -54,6 +56,7 @@ def resolve_templates(
     global_params: dict[str, int],
     generic_fn_dict: dict[str, GenericFn],
     filepath: str,
+    debug: bool,
 ) -> str:
     """
     Resolves templates in the source code.
@@ -81,25 +84,25 @@ def resolve_templates(
     # This needs to be done on the input_text instead of the already processed text
     tasks: list[Task] = utils.get_tasks(input_text, global_params)
 
-    if DEBUG:
+    if debug:
         print("Tasks [1st pass]:")
         pprint.pprint(tasks)
 
-    if DEBUG:
+    if debug:
         print("Searching for subtasks")
 
     for task in tasks:
         subtasks = task.get_sub_tasks(generic_fn_dict)
         tasks.extend(subtasks)
 
-    if DEBUG:
+    if debug:
         print("Tasks [2nd pass (includes subtasks)]:")
         pprint.pprint(tasks)
 
     # Remove duplicate tasks
     tasks = list(set(tasks))
 
-    if DEBUG:
+    if debug:
         print("Tasks [3rd pass (removes duplicate tasks)]:")
         pprint.pprint(tasks)
 
@@ -115,7 +118,6 @@ def resolve_templates(
     )
 
     # Last step: Remove extra blank space & remove auxiliary comments
-
     pattern = r"// Place concrete instances of the (\w+) function here"
     text = re.sub(pattern, "", text)
 
@@ -131,65 +133,35 @@ def resolve_templates(
 if __name__ == "__main__":
     args = parse_args()
 
-    all_files = (
-        args.search_path
-    )  # May be None because args.search_path is an optional argument
+    # Check if the input files exists
+    if not os.path.exists(args.input_file):
+        sys.stderr.write(f"Error: The file '{args.input_file}' does not exist.\n")
+        sys.exit(-1)
 
-    template_files = None
-
-    # Check if all files exist
-    if all_files:
-        for file in all_files:
-            if not os.path.exists(file):
-                sys.stderr.write(f"Error: The file '{file}' does not exist.\n")
-                sys.exit(-1)
-
-        template_files = list(
-            filter(lambda filename: filename.endswith("jtmpl"), all_files)
-        )
-
-    if all_files and DEBUG:
-        print(f'All files: {", ".join(all_files)}')
-        print(f"Template files: {template_files}")
-
-    global_params: dict[str, int] = {}
-    generic_fn_dict: dict[str, GenericFn] = {}
+    with open(args.input_file, "r") as f:
+        text: str = f.read()
 
     # 1st step: Load global parameters from param files
-    if all_files:
-        for file in all_files:
-            with open(file, "r") as f:
-                text: str = f.read()
-            tmp: dict[str, int] = utils.get_params(text)
-            global_params.update(tmp)
+    global_params: dict[str, int] = utils.get_params(text)
 
-    if DEBUG:
+    # 2nd step: Get generic functions dict from Jasmin source code
+    generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
+
+    if args.debug:
         print("DEBUG: Global Param Dictionary")
         pprint.pprint(global_params)
-
-    if all_files:
-        for file in all_files:
-            with open(file, "r") as f:
-                text: str = f.read()
-            tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
-            generic_fn_dict.update(tmp)
-
-    if DEBUG:
         print("DEBUG: Generic Fn Dictionary:")
         pprint.pprint(generic_fn_dict.keys())
 
-    input_file: str = args.input_file
-
-    ## TODO: Handle all template files, not just the input file
-    with open(input_file, "r") as f:
+    with open(args.input_file, "r") as f:
         input_text: str = f.read()
 
     output_text: str = resolve_templates(
-        input_text, global_params, generic_fn_dict, input_file
+        input_text, global_params, generic_fn_dict, args.input_file, args.debug
     )
     output_text += "\n"
 
-    if DEBUG:
+    if args.debug:
         print("\n--------------------------------------------------------------\n")
 
     with open(args.output_file, "w") as f:

@@ -1,6 +1,3 @@
-import re
-
-
 class GenericFn:
     """
     Represents a generic function with its respective relevant attributes.

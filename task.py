@@ -60,7 +60,7 @@ class Task:
             generic_fn = generic_fn_dict[self.fn_name]
         except KeyError:
             sys.stderr.write(
-                f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve"
+                f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve\n"
             )
             sys.exit(-1)
 
@@ -95,7 +95,7 @@ class Task:
             generic_fn = generic_fn_dict[self.fn_name]
         except KeyError:
             sys.stderr.write(
-                f"Could not find {self.fn_name} in generic_fn_dict in Task.get_sub_tasks"
+                f"Could not find {self.fn_name} in generic_fn_dict in Task.get_sub_tasks\n"
             )
             sys.exit(-1)
 
