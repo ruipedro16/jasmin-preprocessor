@@ -1,12 +1,12 @@
 param int FF = 25;
 
-inline fn g_2(stack u64 x) -> reg u64 {
+inline fn g_1(stack u64 x) -> reg u64 {
     reg u64 r;
     r = x;
     return r;
 }
 
-inline fn g_1(stack u64 x) -> reg u64 {
+inline fn g_2(stack u64 x) -> reg u64 {
     reg u64 r;
     r = x;
     return r;

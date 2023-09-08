@@ -13,7 +13,7 @@ from generic_fn import GenericFn
 from task import Task
 
 """
-$ python3 preprocessor.py --input_file <input_file> --output_file <output_file>
+$ python3 preprocessor.py [-d] --input_file <input_file> --output_file <output_file>
 """
 
 
@@ -24,13 +24,6 @@ def parse_args():
         "--input_file",
         required=True,
         help="Input file path",
-        type=str,
-    )
-
-    parser.add_argument(
-        "--search_path",
-        nargs="+",
-        help="Path to read parameters & functions",
         type=str,
     )
 
