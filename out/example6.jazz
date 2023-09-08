@@ -1,10 +1,10 @@
 #[returnaddress="stack"]
-fn f_xyz_1(stack u64 x) -> reg 64 {
+fn f_xyz_2(stack u64 x) -> reg 64 {
     return x;
 }
 
 #[returnaddress="stack"]
-fn f_xyz_2(stack u64 x) -> reg 64 {
+fn f_xyz_1(stack u64 x) -> reg 64 {
     return x;
 }
 
