@@ -4,8 +4,6 @@ import sys
 import utils
 from generic_fn import GenericFn
 
-import pprint
-
 
 class Task:
     """
@@ -47,7 +45,6 @@ class Task:
     def resolve(
         self,
         text: str,
-        global_params: dict[str, int],
         generic_fn_dict: dict[str, GenericFn],
     ) -> str:
         """
@@ -86,10 +83,8 @@ class Task:
         """
         Get the sub-tasks for the current task by resolving nested generic function calls.
         """
-        ### print(f"\n\nGetting subtasks of {self.fn_name}")
-
         subtasks: list[Task] = []
-        
+
         generic_fn: GenericFn = None
         try:
             generic_fn = generic_fn_dict[self.fn_name]
@@ -99,9 +94,7 @@ class Task:
             )
             sys.exit(-1)
 
-        resolved_fn_body: str = self.resolve(
-            generic_fn.fn_body, self.global_params, generic_fn_dict
-        )
+        resolved_fn_body: str = self.resolve(generic_fn.fn_body, generic_fn_dict)
 
         # The 1st function call does not have
         if context_params is None:
@@ -110,30 +103,13 @@ class Task:
             tmp = dict(zip(generic_fn.params, self.template_params))
             context_params.update(tmp)
 
-        ### print(f"Context Params for {self.fn_name}:")
-        ### pprint.pprint(context_params)
-
-        ### print(f"Resolved Params for {self.fn_name}:")
-        ### pprint.pprint(resolved_params)
-
         generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
         for match in re.finditer(generic_fn_call_pattern, resolved_fn_body):
             fn_name, generic_params, _ = match.groups()
             generic_params: list[str] = [p.strip() for p in generic_params.split(",")]
-            ### print(
-            ###     f"Generic params (unresolved) for {fn_name} in {self.fn_name}: {generic_params}"
-            ### )
 
             for param in generic_params:
-                ### print(
-                ###     f"Trying to resolve param {param} for function {fn_name} in {self.fn_name}"
-                ### )
                 try:
-                    ### print(
-                    ###     f"DEBUG: Printing context_params of {fn_name} in {self.fn_name}"
-                    ### )
-                    ### pprint.pprint(context_params)
-
                     # Context params may override global params
                     context_params[param] = int(context_params[param])
                 except KeyError:
@@ -141,13 +117,7 @@ class Task:
                         param, self.global_params[param]
                     )
 
-            # print(f"Context params of {fn_name} in {self.fn_name}")
-            # pprint.pprint(context_params)
-
             concrete_args = [int(context_params.get(p, p)) for p in generic_params]
-
-            # print("concrete args are")
-            # print(concrete_args)
 
             subtask = Task(fn_name, concrete_args, self.global_params)
             subtasks.append(subtask)
@@ -159,7 +129,5 @@ class Task:
                 context_params,  # Pass resolved_params_local in the recursion
             )
             subtasks.extend(sub_subtasks)
-
-        # print("\n\n")
 
         return subtasks

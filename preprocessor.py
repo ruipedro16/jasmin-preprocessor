@@ -55,7 +55,6 @@ def resolve_templates(
     text: str,
     global_params: dict[str, int],
     generic_fn_dict: dict[str, GenericFn],
-    filepath: str,
     debug: bool,
 ) -> str:
     """
@@ -108,7 +107,7 @@ def resolve_templates(
 
     # 6th step: Resolve each task
     for task in tasks:
-        text = task.resolve(text, global_params, generic_fn_dict)
+        text = task.resolve(text, generic_fn_dict)
 
     # 7th step: Resolve generic function calls that were not resolved before
     text = re.sub(
@@ -157,7 +156,7 @@ if __name__ == "__main__":
         input_text: str = f.read()
 
     output_text: str = resolve_templates(
-        input_text, global_params, generic_fn_dict, args.input_file, args.debug
+        input_text, global_params, generic_fn_dict, args.debug
     )
     output_text += "\n"
 
