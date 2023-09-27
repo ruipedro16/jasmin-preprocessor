@@ -3,8 +3,49 @@ import re
 from generic_fn import GenericFn
 from task import Task
 
+from typing import TypeVar
+
+T = TypeVar("T", bound="__eq__")
+
+
+def remove_duplicates(input_list: list[T]) -> list[T]:
+    """
+    Removes duplicates from a list and returns a new list with unique elements.
+
+    Args:
+        input_list (list[T]): The input list with potential duplicates.
+
+    Returns:
+        list[T]: A new list with duplicates removed.
+    """
+    res: list[T] = []
+
+    for item in input_list:
+        if item not in res:
+            res.append(item)
+
+    return res
+
+
+def replace_eval_global_params(text: str, params: dict[str, int]) -> str:
+    def eval_expression(match):
+        name, expression = match.groups()
+        try:
+            value = eval(expression.replace('/', '//'), params)
+            return f'param int {name} = {value};'
+        except Exception as e:
+            print(f"Error evaluating expression for {name}: {e}")
+            return match.group(0)
+
+    pattern = r"param\s+int\s+(\w+)\s*=\s*(.+);"
+    updated_text = re.sub(pattern, eval_expression, text)
+    return updated_text
+
 
 def parse_tasks(text: [str], global_params: dict[str, int]) -> [Task]:
+    if text is None:
+        return []
+
     res: [Task] = []
 
     for s in text:
@@ -12,7 +53,6 @@ def parse_tasks(text: [str], global_params: dict[str, int]) -> [Task]:
         params: dict[str, int] = {}
         fn_name: str = fields[0].split(":")[-1]
         for field in fields:
-            print(field)
             if field.startswith("p:"):
                 # Split the field by ':'
                 _, key, value = field.split(":")
@@ -58,11 +98,18 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"([#\[\]\"=\w\s]*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    pattern = r"([#\[\]\"=\w]+)?\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
             annotation, fn_name, params, args, fn_body = match.groups()
+
+            # print(f"Annotation: {annotation}")
+            # print(f"Fn name: {fn_name}")
+            # print(f"Params: {params}")
+            # print(f"Args: {args}")
+            # print(f"Fn Body: {fn_body}")
+            # print("---------------", end="\n\n")
 
             annotation = annotation.strip()
             if "#" in annotation:
@@ -122,7 +169,7 @@ def replace_generic_calls_with_concrete(
         for param in generic_params:
             try:
                 # Evaluate the expression using the global_params dict to get the concrete value
-                concrete_params[param] = eval(param, None, global_params)
+                concrete_params[param] = eval(param.replace('/', '//'), None, global_params)
             except (NameError, TypeError, ValueError, SyntaxError):
                 # If evaluation fails, use the original param as a string
                 concrete_params[param] = param
@@ -151,7 +198,7 @@ def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
         for param in generic_params:
             try:
                 # Evaluate the expression using the param_dict to get the concrete value
-                concrete_params[param] = eval(param, None, global_params)
+                concrete_params[param] = eval(param.replace('/', '//'), None, global_params)
             except (NameError, TypeError, ValueError, SyntaxError):
                 # If evaluation fails, use the original param as a string
                 concrete_params[param] = param
