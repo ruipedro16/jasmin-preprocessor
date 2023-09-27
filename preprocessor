@@ -11,6 +11,7 @@ import argparse
 import utils
 from generic_fn import GenericFn
 from task import Task
+from typed_generic_fn import TypedGenericFn
 
 """
 $ python3 preprocessor [-d] --input_file <input_file> --output_file <output_file> --task <task to generate the export function>
@@ -69,18 +70,28 @@ def resolve_templates(
     # 2nd step: Update generic functions dict from Jasmin source code
     tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
     generic_fn_dict.update(tmp)
+    
+    # 2.5 step: Update generic functions dict from Jasmin source code
+    tmp: dict[str, TypedGenericFn] = utils.get_typed_generic_fn_dict(text)
+    typed_generic_fn_dict.update(tmp)
 
     # 3rd step: Remove the code of the generic functions from the source code
+    text = utils.remove_typed_generic_fn_text(text)
     text = utils.remove_generic_fn_text(text)
 
     # 4th step: Replace calls to generic functions with calls to concrete functions
+    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)
     text = utils.replace_generic_calls_with_concrete(text, global_params)
 
     # 5th step: Get a list of all the tasks that need to be done
     # First, we gather the tasks without handling nested calls, and then, after all
     # the tasks are collected, resolve the nested calls in the Task class.
     # This needs to be done on the input_text instead of the already processed text
-    tasks: list[Task] = export_tasks + utils.get_tasks(input_text, global_params)
+    tasks: list[Task] = (
+        export_tasks
+        + utils.get_tasks(input_text, global_params)
+        + utils.get_typed_fn_tasks(input_text, global_params)
+    )
 
     if debug:
         print("Tasks [1st pass]:")
@@ -90,7 +101,7 @@ def resolve_templates(
         print("Searching for subtasks")
 
     for task in tasks:
-        subtasks = task.get_sub_tasks(generic_fn_dict)
+        subtasks = task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
         tasks.extend(subtasks)
 
     if debug:
@@ -106,7 +117,7 @@ def resolve_templates(
 
     # 6th step: Resolve each task
     for task in tasks:
-        text = task.resolve(text, generic_fn_dict)
+        text = task.resolve(text, generic_fn_dict, typed_generic_fn_dict)
 
     # 7th step: Resolve generic function calls that were not resolved before
     # FIXME: TODO: This may have to be done in Task so it has access to the context params
@@ -149,16 +160,26 @@ if __name__ == "__main__":
     # 2nd step: Get generic functions dict from Jasmin source code
     generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
 
+    # 2.5 step: Get typed generic functions dict from Jasmin source code
+    typed_generic_fn_dict: dict[str, TypedGenericFn] = utils.get_typed_generic_fn_dict(
+        text
+    )
+
     export_tasks: [Task] = utils.parse_tasks(args.task, global_params)
     if args.debug:
         print("DEBUG: Export tasks: ")
         pprint.pprint(export_tasks)
+        print("\n")
 
     if args.debug:
         print("DEBUG: Global Param Dictionary")
         pprint.pprint(global_params)
+        print("\n")
         print("DEBUG: Generic Fn Dictionary:")
         pprint.pprint(generic_fn_dict.keys())
+        print("\n")
+        print("DEBUG: Typed Generic Fn Dictionary:")
+        pprint.pprint(typed_generic_fn_dict)
 
     with open(args.input_file, "r") as f:
         input_text: str = f.read()

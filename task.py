@@ -3,6 +3,9 @@ import sys
 
 import utils
 from generic_fn import GenericFn
+from typed_generic_fn import TypedGenericFn
+
+from typing import Union
 
 import pprint
 
@@ -23,10 +26,16 @@ class Task:
         fn_name: str,
         template_params: list[str],
         global_params: dict[str, int],
+        # unless specified otherwise, a task is considered to be a simple generic function (i.e. not typed)
+        typed_fn_names: list[str] = None,
+        typed_fn_types: list[str] = None,
     ):
         self.fn_name = fn_name
         self.template_params = template_params
         self.global_params = global_params
+        self.typed_fn_names = [typed_fn_names]  # TODO: FIXME:
+        self.typed_fn_types = [typed_fn_types]  # TODO: FIXME:
+        self.is_typed_task = typed_fn_names and typed_fn_types
 
     def __eq__(self, other):
         if not isinstance(other, Task):
@@ -35,10 +44,20 @@ class Task:
         template_params_int_self: [int] = [int(val) for val in self.template_params]
         template_params_int_other: [int] = [int(val) for val in other.template_params]
 
-        return (
-            self.fn_name == other.fn_name
-            and template_params_int_self == template_params_int_other
-        )
+        if self.is_typed_task and other.is_typed_task:
+            return (
+                self.fn_name == other.fn_name
+                and template_params_int_self == template_params_int_other
+                and self.typed_fn_names == other.typed_fn_names
+                and self.typed_fn_types == other.typed_fn_types
+            )
+        elif (not self.is_typed_task) and (not other.is_typed_task):
+            return (
+                self.fn_name == other.fn_name
+                and template_params_int_self == template_params_int_other
+            )
+        else:
+            return False
 
     def __hash__(self):
         # Convert the list to a tuple for hashing (TypeError: unhashable type: 'list')
@@ -46,30 +65,42 @@ class Task:
 
     def __repr__(self) -> str:
         params_str = ", ".join(str(param) for param in self.template_params)
-        return f"Task(fn_name='{self.fn_name}', params=[{params_str}])"
+        return f"Task(fn_name='{self.fn_name}', params=[{params_str}], typed_fn_names=[{self.typed_fn_names}], typed_fn_types=[{self.typed_fn_types}])"
 
     def resolve(
         self,
         text: str,
         generic_fn_dict: dict[str, GenericFn],
+        typed_generic_fn_dict: dict[str, TypedGenericFn],
     ) -> str:
         """
         Resolve the function and return the concrete definition
         """
         pattern = rf"// Place concrete instances of the {self.fn_name} function here"
 
-        generic_fn: GenericFn = None
+        generic_fn: Union[GenericFn, TypedGenericFn] = None
         try:
             generic_fn = generic_fn_dict[self.fn_name]
         except KeyError:
-            sys.stderr.write(
-                f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve\n"
-            )
-            sys.exit(-1)
+            try:
+                generic_fn = typed_generic_fn_dict[self.fn_name]
+            except KeyError:
+                sys.stderr.write(
+                    f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve\n"
+                )
+                sys.exit(-1)
 
         replacement_dict: dict[str, int] = dict(
             zip(generic_fn.params, self.template_params)
         )
+
+        if self.is_typed_task:
+            tmp = dict(zip(generic_fn.generic_fn_names, self.typed_fn_names))
+            tm2 = dict(zip(generic_fn.generic_fn_types, self.typed_fn_types))
+            replacement_dict = {**replacement_dict, **tmp, **tm2}
+
+        # print("DEBUG: Printing replacement DICT")
+        # pprint.pprint(replacement_dict)
 
         text = re.sub(
             pattern,
@@ -85,6 +116,7 @@ class Task:
     def get_sub_tasks(
         self,
         generic_fn_dict: dict[str, GenericFn],
+        typed_generic_fn_dict: [str, TypedGenericFn],
         context_params: dict[str, int] = None,
     ) -> list["Task"]:
         """
@@ -92,16 +124,21 @@ class Task:
         """
         subtasks: list[Task] = []
 
-        generic_fn: GenericFn = None
+        generic_fn: Union[GenericFn, TypedGenericFn] = None
         try:
             generic_fn = generic_fn_dict[self.fn_name]
         except KeyError:
-            sys.stderr.write(
-                f"Could not find {self.fn_name} in generic_fn_dict in Task.get_sub_tasks\n"
-            )
-            sys.exit(-1)
+            try:
+                generic_fn = typed_generic_fn_dict[self.fn_name]
+            except KeyError:
+                sys.stderr.write(
+                    f"Could not find {self.fn_name} in generic_fn_dict/typed_generic_fn_dict in Task.get_sub_tasks\n"
+                )
+                sys.exit(-1)
 
-        resolved_fn_body: str = self.resolve(generic_fn.fn_body, generic_fn_dict)
+        resolved_fn_body: str = self.resolve(
+            generic_fn.fn_body, generic_fn_dict, typed_generic_fn_dict
+        )
 
         # The 1st function call does not have
         if context_params is None:
@@ -140,7 +177,7 @@ class Task:
                             )
                         )  # TODO: handle key error
                         context_params[param] = eval(
-                            param.replace('/', '//'),
+                            param.replace("/", "//"),
                             {},
                             {**self.global_params, **context_params, **template_dict},
                         )
