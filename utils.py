@@ -304,7 +304,7 @@ def replace_typed_generic_calls_with_concrete(
 def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
     """
     This function also replaces generic function calls with calls to the concrete functions
-    """
+    """    
     tasks = set()
     generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
 
@@ -470,14 +470,18 @@ def resolve_generic_fn_calls(text: str, global_params: dict[str, int]) -> str:
     return text
 
 
-def parse_expand_macros(text: str, global_param_dict: dict[str, int]) -> dict[str, str]:
+def replace_expand_macros(text: str) -> str:
     """
-    NOTE: Macros can only be constants (like param int) or be arithmetic expressions involving param ints
+    Only performs find-replace
     """
-    res: dict[str, str] = {}
-
-    pattern = r"#expand\s+(\S+)\s+([^\/\/\n]+)"  # TODO: FIXME: Improve regex to support comments after macro definition
+    
+    pattern = r"#expand\s+(\S+)\s+([^\/\/\n]+)"
     matches = dict(re.findall(pattern, text, re.MULTILINE))
-    return {
-        k: eval(v.replace("/", "//"), {}, global_param_dict) for k, v in matches.items()
-    }  # Because / is integer division
+    
+    # Remove #expand from the jasmin source code
+    text = re.sub(pattern, '', text)
+    
+    for key, value in matches.items():
+        text = text.replace(f"{key}", str(value))
+
+    return text

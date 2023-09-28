@@ -149,22 +149,21 @@ if __name__ == "__main__":
     with open(args.input_file, "r") as f:
         text: str = f.read()
 
+    # Replace macros
+    text = utils.replace_expand_macros(text)
+
     # 1st step: Load global parameters from param files
     global_params: dict[str, int] = utils.get_params(text)
-    macros_dict: dict[str, str] = utils.parse_expand_macros(text, global_params)
 
     if args.debug:
         print("DEBUG: Global Param Dictionary")
         pprint.pprint(global_params)
         print("\n")
-        print("DEBUG: Macro  Dictionary")
-        pprint.pprint(macros_dict)
-        print("\n")
-
-    global_params.update(
-        macros_dict
-    )  # Merge global params and macros dict (both have global scope)
-
+    
+    if args.debug:
+        print('Text after macro replacement')
+        print(text, end='\n\n')
+        
     # 2nd step: Get generic functions dict from Jasmin source code
     generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
 
@@ -190,6 +189,8 @@ if __name__ == "__main__":
 
     with open(args.input_file, "r") as f:
         input_text: str = f.read()
+
+    input_text = utils.replace_expand_macros(input_text)
 
     output_text: str = resolve_templates(
         input_text, global_params, generic_fn_dict, args.debug

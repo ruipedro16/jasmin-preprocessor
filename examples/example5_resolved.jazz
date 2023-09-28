@@ -1,9 +1,5 @@
-#expand MACRO1 123
-
-param int A = 2;
-param int B = 3;
-
-#expand MACRO2 2 * (A + B)
+param int A = 1;
+param int B = 2;
 
 inline fn add1(reg u32 a) -> reg u32 
 { 
@@ -11,7 +7,7 @@ inline fn add1(reg u32 a) -> reg u32
   return a;
 }
 
-inline fn __map_e_add1_u32_10(reg ptr u32[10] a) -> reg ptr u32[10] 
+inline fn __map_e_add1_u32_6(reg ptr u32[6] a) -> reg ptr u32[6] 
 {
   reg u32 i;
   inline int j;
@@ -19,7 +15,7 @@ inline fn __map_e_add1_u32_10(reg ptr u32[10] a) -> reg ptr u32[10]
   reg u32 t;
 
   i = 0;
-  while(i < 10)
+  while(i < 6)
   {
     elem = a[(int) i];
     elem = add1(elem);
@@ -29,9 +25,9 @@ inline fn __map_e_add1_u32_10(reg ptr u32[10] a) -> reg ptr u32[10]
   return a;
 }
 
-inline fn __map_add1_10(reg ptr u32[10] a) -> reg ptr u32[10]
+inline fn __map_add1_6(reg ptr u32[6] a) -> reg ptr u32[6]
 {
-  a = __map_e_add1_u32_10(a);
+  a = __map_e_add1_u32_6(a);
   return a;
 }
 
@@ -41,7 +37,7 @@ export fn test(reg u64 _a) {
     reg u64 u;
 
     ap = a;
-    ap = __map_add1_10(ap);
+    ap = __map_add1_6(ap);
     a = ap;
 
     u = (64u) a[2];

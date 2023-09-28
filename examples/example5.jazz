@@ -1,8 +1,7 @@
-#expand MACRO1 123
+param int A = 1;
+param int B = 2;
 
-param int A = 2;
-param int B = 3;
-
+#expand FUNCTION_NAME add1
 #expand MACRO2 2 * (A + B)
 
 inline fn add1(reg u32 a) -> reg u32 
@@ -31,7 +30,7 @@ inline fn __map_e<N>[F;TYPE](reg ptr TYPE[N] a) -> reg ptr TYPE[N]
 
 inline fn __map_add1<N>(reg ptr u32[N] a) -> reg ptr u32[N]
 {
-  a = __map_e<N>[add1 ; u32](a);
+  a = __map_e<N>[FUNCTION_NAME ; u32](a);
   return a;
 }//<>
 
