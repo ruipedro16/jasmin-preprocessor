@@ -19,8 +19,8 @@ class TypedGenericFn:
         self.params = [p.strip() for p in params.split(",")]
         self.args = args
         self.fn_body = fn_body
-        self.generic_fn_names = [name.strip() for name in generic_fn_names.split()]
-        self.generic_fn_types = [type.strip() for type in generic_fn_types.split()]
+        self.generic_fn_names = [name.strip() for name in generic_fn_names]
+        self.generic_fn_types = [type.strip() for type in generic_fn_types]
 
     def __repr__(self) -> str:
         return (

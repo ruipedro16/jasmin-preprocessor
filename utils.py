@@ -9,6 +9,10 @@ from typing import Union, TypeVar
 T = TypeVar("T", bound="__eq__")
 
 
+def string_to_singleton_list(input_string: str) -> list[str]:
+    return [input_string]
+
+
 def remove_duplicates(input_list: list[T]) -> list[T]:
     """
     Removes duplicates from a list and returns a new list with unique elements.
@@ -132,15 +136,23 @@ def get_typed_generic_fn_dict(input_text: str) -> dict[str, TypedGenericFn]:
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
             annotation, fn_name, params, typed_params, args, fn_body = match.groups()
-            typed_fn_name: str = typed_params.split(",")[0].strip()
-            typed_fn_type: str = typed_params.split(",")[-1].strip()
+            typed_fn_names: str = typed_params.split(";")[0].split(",")
+            typed_fn_type: str = [
+                t.strip() for t in typed_params.split(";")[-1].split(",")
+            ]
 
             annotation = annotation.strip()
             if "#" in annotation:
                 annotation += "\n"
 
             typed_generic_fn = TypedGenericFn(
-                annotation, fn_name, params, args, fn_body, typed_fn_name, typed_fn_type
+                annotation,
+                fn_name,
+                params,
+                args,
+                fn_body,
+                typed_fn_names,
+                typed_fn_type,
             )
             res[fn_name] = typed_generic_fn
 
@@ -153,7 +165,7 @@ def remove_generic_fn_text(input_text: str) -> str:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"([#\[\]\"=\w\s]*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    pattern = r"^([#\[\]\"=\w\s]*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
     matches = re.finditer(pattern, input_text, flags=re.MULTILINE)
 
@@ -188,8 +200,6 @@ def remove_typed_generic_fn_text(input_text: str) -> str:
     replacements = []
 
     for match in matches:
-        # print("debug: Printing match groups")
-        # print(match.groups())
         _, fn_name, _, _, _, _ = match.groups()
         replacement_text = (
             f"\n\n// Place concrete instances of the {fn_name} function here"
@@ -247,6 +257,7 @@ def replace_typed_generic_calls_with_concrete(
     """
     Same as replace_generic_calls_with_concrete but for typed generic functions
     """
+
     def replace_fn(match):
         fn_name, generic_params, t = match.groups()
         generic_params = [p.strip() for p in generic_params.split(",")]
@@ -264,10 +275,21 @@ def replace_typed_generic_calls_with_concrete(
 
         concrete_args = [str(concrete_params.get(p, p)) for p in generic_params]
 
-        typed_fn_names = t.split(",")[0].strip()
-        typed_fn_types = t.split(",")[-1].strip()
+        typed_fn_names = t.split(";")[0].strip()
+        typed_fn_types = t.split(";")[-1].strip()
+        
+        
+        if "," in typed_fn_types:
+            typed_fn_types = [t.strip() for t in typed_fn_types.split(",")]
 
-        concrete_call = f"{fn_name}_{typed_fn_names}_{typed_fn_types}_" + "_".join(
+        if isinstance(typed_fn_names, str):
+            typed_fn_names = string_to_singleton_list(typed_fn_names)
+        if isinstance(typed_fn_types, str):
+            typed_fn_types = string_to_singleton_list(typed_fn_types)
+
+        typed_fn_types_str: str = "_".join(typed_fn_types)
+        typed_fn_names_str : str = '_'.join(typed_fn_names)
+        concrete_call = f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}_" + "_".join(
             concrete_args
         )
 
@@ -325,6 +347,7 @@ def replace_parameters_in_string(text: str, replacement_dict: dict[str, int]) ->
 def build_concrete_fn(
     generic_fn: Union[GenericFn, TypedGenericFn],
     replacement_dict: dict[str, int],
+    is_typed_task: bool,
 ) -> str:
     """
     Build the concrete function from the generic one
@@ -334,7 +357,7 @@ def build_concrete_fn(
         replacement_dict (dict[str, int]): Map containing the value of each parameter to replace in the function
     """
     tmp = ""
-    if generic_fn.generic_fn_types is None:  # Simple generic function
+    if not is_typed_task:  # Simple generic function
         tmp = replace_parameters_in_string(
             "_".join(generic_fn.params), replacement_dict
         )
@@ -370,8 +393,13 @@ def get_typed_fn_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
     def replace_fn(match) -> str:
         fn_name, generic_params, typed_fn_info, generic_args = match.groups()
         generic_params: list[str] = [p.strip() for p in generic_params.split(",")]
-        typed_fn_names: str = typed_fn_info.split(",")[0].strip()
-        typed_fn_types: str = typed_fn_info.split(",")[-1].strip()
+        typed_fn_names: str = tuple(
+            [name.strip() for name in typed_fn_info.split(";")[0].split(",")]
+        )
+        typed_fn_types: str = tuple(
+            [t.strip() for t in typed_fn_info.split(";")[-1].split(",")]
+        )  # because a list is not hashable
+
         concrete_params = {}
 
         # print('Debug in get tasks')
@@ -394,8 +422,10 @@ def get_typed_fn_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
         )  # Store the task with all parameters
 
         # TODO: FIXME: Update to handle multiple typed fn names
+        typed_fn_names_str: str = "_".join(typed_fn_names)
+        typed_fn_types_str: str = "_".join(typed_fn_types)
         return (
-            f"{fn_name}_{typed_fn_names[0]}_{typed_fn_types[0]}"
+            f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}"
             + "_".join(concrete_args)
             + f"({generic_args})"
         )
@@ -407,3 +437,34 @@ def get_typed_fn_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
         for fn_name, params, typed_fn_names, typed_fn_types in tasks
         if all(param.isdigit() for param in params)
     ]
+
+
+def resolve_generic_fn_calls(text: str, global_params: dict[str, int]) -> str:
+    if text is None:
+        return
+
+    # Typed first
+    typed_generic_fn_call_pattern = r"(\w+)<([^>]+)>\s*\[([^\]]+)]\(([^)]+)\);"
+    for match in re.finditer(typed_generic_fn_call_pattern, text):
+        fn_name, generic_params, type_info, args = match.groups()
+        fn_names = [type_info.split(";")[0].strip()]
+        fn_types = [type_info.split(";")[-1].strip()]
+        names_types = list(zip(fn_names, fn_types))
+        replacement = (
+            fn_name
+            + "_"
+            + "_".join([x + "_" + y for x, y in names_types] + [generic_params])
+            + "("
+            + ", ".join(args)
+            + ");"
+        )
+        text = re.sub(re.escape(match.group(0)), replacement, text)
+
+    # Regular generic fn
+    text = re.sub(
+        r"(\w+)<([^>]+)>",
+        lambda match: f"{match.group(1)}_{'_'.join(str(global_params.get(p.strip(), eval(p.strip().replace('/', '//'), {}, global_params))) for p in match.group(2).split(','))}",
+        text,
+    )
+
+    return text

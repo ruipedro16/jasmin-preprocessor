@@ -70,7 +70,7 @@ def resolve_templates(
     # 2nd step: Update generic functions dict from Jasmin source code
     tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
     generic_fn_dict.update(tmp)
-    
+
     # 2.5 step: Update generic functions dict from Jasmin source code
     tmp: dict[str, TypedGenericFn] = utils.get_typed_generic_fn_dict(text)
     typed_generic_fn_dict.update(tmp)
@@ -80,9 +80,9 @@ def resolve_templates(
     text = utils.remove_generic_fn_text(text)
 
     # 4th step: Replace calls to generic functions with calls to concrete functions
-    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)
+    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)   
     text = utils.replace_generic_calls_with_concrete(text, global_params)
-
+    
     # 5th step: Get a list of all the tasks that need to be done
     # First, we gather the tasks without handling nested calls, and then, after all
     # the tasks are collected, resolve the nested calls in the Task class.
@@ -93,12 +93,11 @@ def resolve_templates(
         + utils.get_typed_fn_tasks(input_text, global_params)
     )
 
+
     if debug:
         print("Tasks [1st pass]:")
         pprint.pprint(tasks)
-
-    if debug:
-        print("Searching for subtasks")
+        print("\n", end="")
 
     for task in tasks:
         subtasks = task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
@@ -107,6 +106,7 @@ def resolve_templates(
     if debug:
         print("Tasks [2nd pass (includes subtasks)]:")
         pprint.pprint(tasks)
+        print("\n", end="")
 
     # Remove duplicate tasks
     tasks = utils.remove_duplicates(tasks)
@@ -114,18 +114,14 @@ def resolve_templates(
     if debug:
         print("Tasks [3rd pass (removes duplicate tasks)]:")
         pprint.pprint(tasks)
+        print("\n", end="")
 
     # 6th step: Resolve each task
     for task in tasks:
         text = task.resolve(text, generic_fn_dict, typed_generic_fn_dict)
 
     # 7th step: Resolve generic function calls that were not resolved before
-    # FIXME: TODO: This may have to be done in Task so it has access to the context params
-    text = re.sub(
-        r"(\w+)<([^>]+)>",
-        lambda match: f"{match.group(1)}_{'_'.join(str(global_params.get(p.strip(), eval(p.strip().replace('/', '//'), {}, global_params))) for p in match.group(2).split(','))}",
-        text,
-    )
+    text = utils.resolve_generic_fn_calls(text, global_params)
 
     # Last step: Remove extra blank space & remove auxiliary comments
     pattern = r"// Place concrete instances of the (\w+) function here"
@@ -179,7 +175,9 @@ if __name__ == "__main__":
         pprint.pprint(generic_fn_dict.keys())
         print("\n")
         print("DEBUG: Typed Generic Fn Dictionary:")
+        pprint.pprint(typed_generic_fn_dict.keys())
         pprint.pprint(typed_generic_fn_dict)
+        print("\n")
 
     with open(args.input_file, "r") as f:
         input_text: str = f.read()
