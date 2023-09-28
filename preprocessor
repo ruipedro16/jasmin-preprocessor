@@ -80,9 +80,9 @@ def resolve_templates(
     text = utils.remove_generic_fn_text(text)
 
     # 4th step: Replace calls to generic functions with calls to concrete functions
-    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)   
+    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)
     text = utils.replace_generic_calls_with_concrete(text, global_params)
-    
+
     # 5th step: Get a list of all the tasks that need to be done
     # First, we gather the tasks without handling nested calls, and then, after all
     # the tasks are collected, resolve the nested calls in the Task class.
@@ -92,7 +92,6 @@ def resolve_templates(
         + utils.get_tasks(input_text, global_params)
         + utils.get_typed_fn_tasks(input_text, global_params)
     )
-
 
     if debug:
         print("Tasks [1st pass]:")
@@ -152,6 +151,19 @@ if __name__ == "__main__":
 
     # 1st step: Load global parameters from param files
     global_params: dict[str, int] = utils.get_params(text)
+    macros_dict: dict[str, str] = utils.parse_expand_macros(text, global_params)
+
+    if args.debug:
+        print("DEBUG: Global Param Dictionary")
+        pprint.pprint(global_params)
+        print("\n")
+        print("DEBUG: Macro  Dictionary")
+        pprint.pprint(macros_dict)
+        print("\n")
+
+    global_params.update(
+        macros_dict
+    )  # Merge global params and macros dict (both have global scope)
 
     # 2nd step: Get generic functions dict from Jasmin source code
     generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
@@ -168,15 +180,12 @@ if __name__ == "__main__":
         print("\n")
 
     if args.debug:
-        print("DEBUG: Global Param Dictionary")
-        pprint.pprint(global_params)
-        print("\n")
         print("DEBUG: Generic Fn Dictionary:")
         pprint.pprint(generic_fn_dict.keys())
         print("\n")
         print("DEBUG: Typed Generic Fn Dictionary:")
         pprint.pprint(typed_generic_fn_dict.keys())
-        pprint.pprint(typed_generic_fn_dict)
+        # pprint.pprint(typed_generic_fn_dict)
         print("\n")
 
     with open(args.input_file, "r") as f:

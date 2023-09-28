@@ -277,8 +277,7 @@ def replace_typed_generic_calls_with_concrete(
 
         typed_fn_names = t.split(";")[0].strip()
         typed_fn_types = t.split(";")[-1].strip()
-        
-        
+
         if "," in typed_fn_types:
             typed_fn_types = [t.strip() for t in typed_fn_types.split(",")]
 
@@ -288,9 +287,10 @@ def replace_typed_generic_calls_with_concrete(
             typed_fn_types = string_to_singleton_list(typed_fn_types)
 
         typed_fn_types_str: str = "_".join(typed_fn_types)
-        typed_fn_names_str : str = '_'.join(typed_fn_names)
-        concrete_call = f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}_" + "_".join(
-            concrete_args
+        typed_fn_names_str: str = "_".join(typed_fn_names)
+        concrete_call = (
+            f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}_"
+            + "_".join(concrete_args)
         )
 
         return concrete_call
@@ -468,3 +468,16 @@ def resolve_generic_fn_calls(text: str, global_params: dict[str, int]) -> str:
     )
 
     return text
+
+
+def parse_expand_macros(text: str, global_param_dict: dict[str, int]) -> dict[str, str]:
+    """
+    NOTE: Macros can only be constants (like param int) or be arithmetic expressions involving param ints
+    """
+    res: dict[str, str] = {}
+
+    pattern = r"#expand\s+(\S+)\s+([^\/\/\n]+)"  # TODO: FIXME: Improve regex to support comments after macro definition
+    matches = dict(re.findall(pattern, text, re.MULTILINE))
+    return {
+        k: eval(v.replace("/", "//"), {}, global_param_dict) for k, v in matches.items()
+    }  # Because / is integer division
