@@ -33,7 +33,7 @@ class Task:
         self.fn_name = fn_name
         self.template_params = template_params
         self.global_params = global_params
-        
+
         if isinstance(typed_fn_names, str):
             self.typed_fn_names = utils.string_to_singleton_list(typed_fn_names)
         else:
@@ -43,7 +43,7 @@ class Task:
             self.typed_fn_types = utils.string_to_singleton_list(typed_fn_types)
         else:
             self.typed_fn_types = typed_fn_types
-            
+
         self.is_typed_task = typed_fn_names and typed_fn_types
 
     def __eq__(self, other):
@@ -131,7 +131,8 @@ class Task:
         """
         subtasks: list[Task] = []
 
-        # print("Context params")
+        # print(f'\n\nDebug in Get Sub Task for task {self.fn_name}')
+        # print("Context params at the beginning")
         # print(context_params)
         # print("Generic_Fn_Dict")
         # pprint.pprint(generic_fn_dict.keys())
@@ -222,8 +223,15 @@ class Task:
         typed_generic_fn_call_pattern = r"(\w+)<([^>]+)>\s*\[([^\]]+)]\(([^)]+)\);"
         for match in re.finditer(typed_generic_fn_call_pattern, resolved_fn_body):
             fn_name, generic_params, type_info, _ = match.groups()
-            fn_names = type_info.split(";")[0].strip()
-            fn_types = type_info.split(";")[-1].strip()
+            fn_names = type_info.split(";")[0]
+            if isinstance(fn_names, str):
+                fn_names: list[str] = utils.string_to_singleton_list(fn_names)
+            fn_names = [v.strip() for v in fn_names]
+
+            fn_types = type_info.split(";")[-1]
+            if isinstance(fn_types, str):
+                fn_types: list[str] = utils.string_to_singleton_list(fn_types)
+            fn_types = [v.strip() for v in fn_types]
 
             if fn_name == self.fn_name:
                 sys.stderr.write(f"Recursive functions not supported: {self.fn_name}\n")
@@ -259,6 +267,9 @@ class Task:
                         sys.stderr.write("Could not evaluate parameter: {param}")
 
             concrete_args = [int(context_params.get(p, p)) for p in generic_params]
+
+            fn_names: list[str] = utils.eval_list(fn_names, context_params)
+            fn_types: list[str] = utils.eval_list(fn_types, context_params)
 
             subtask = Task(
                 fn_name, concrete_args, self.global_params, fn_names, fn_types

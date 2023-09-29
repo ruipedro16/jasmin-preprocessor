@@ -9,6 +9,18 @@ from typing import Union, TypeVar
 T = TypeVar("T", bound="__eq__")
 
 
+def eval_list(input_list, eval_dict):
+    res = []
+    for v in input_list:
+        try:
+            evaluated_value = eval(v, {}, eval_dict)
+        except NameError:
+            # If an exception is raised during evaluation, keep the original value
+            evaluated_value = v
+        res.append(evaluated_value)
+    return res
+
+
 def string_to_singleton_list(input_string: str) -> list[str]:
     return [input_string]
 
@@ -304,7 +316,7 @@ def replace_typed_generic_calls_with_concrete(
 def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
     """
     This function also replaces generic function calls with calls to the concrete functions
-    """    
+    """
     tasks = set()
     generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
 
@@ -474,13 +486,13 @@ def replace_expand_macros(text: str) -> str:
     """
     Only performs find-replace
     """
-    
+
     pattern = r"#expand\s+(\S+)\s+([^\/\/\n]+)"
     matches = dict(re.findall(pattern, text, re.MULTILINE))
-    
+
     # Remove #expand from the jasmin source code
-    text = re.sub(pattern, '', text)
-    
+    text = re.sub(pattern, "", text)
+
     for key, value in matches.items():
         text = text.replace(f"{key}", str(value))
 

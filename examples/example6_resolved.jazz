@@ -1,0 +1,45 @@
+inline fn id(reg u32 a) -> reg u32 {
+    return a;
+}
+
+// F is ignored (not used in the function)
+// TODO: Maybe support fn__TYPE_N(...) -> ... { ... }
+
+inline fn id_array_id_u32_4(reg ptr u32[4] a) -> reg ptr u32[4]
+{
+    inline int i;
+    reg u32 t;
+    for i = 0 to 4
+    {
+        
+    }
+    return a;
+}
+
+inline fn foo_id_u32_4(reg ptr u32[4] a) -> reg ptr u32[4]
+{
+    reg TYPE u;
+    inline int i;
+    for i = 0 to 4
+    {
+        u = id(a[i]);
+        a[i] = u;
+    }
+
+    a = id_array_id_u32_4(a);
+
+    return a;
+}
+
+export fn test(reg u64 _a) {
+    stack u32[4] a;
+    reg ptr u32[4] ap;
+    reg u64 u;
+
+    ap = a;
+    ap = foo_id_u32_4(ap);
+    a = ap;
+
+    u = (64u) a[2];
+    [_a] = u;
+}
