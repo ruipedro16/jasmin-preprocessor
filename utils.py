@@ -473,8 +473,6 @@ def resolve_generic_fn_calls(text: str, global_params: dict[str, int]) -> str:
         )
         text = re.sub(re.escape(match.group(0)), replacement, text)
 
-    print(text)
-
     # Regular generic fn
     text = re.sub(
         r"(\w+)<(.+)>",
