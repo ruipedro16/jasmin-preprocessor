@@ -458,7 +458,6 @@ def resolve_generic_fn_calls(text: str, global_params: dict[str, int]) -> str:
     # Typed first
     typed_generic_fn_call_pattern = r"(\w+)<([^>]+)>\s*\[([^\]]+)]\(([^)]+)\);"
     for match in re.finditer(typed_generic_fn_call_pattern, text):
-        print(match.groups())
         fn_name, generic_params, type_info, args = match.groups()
         fn_names = [type_info.split(";")[0].strip()]
         fn_types = [type_info.split(";")[-1].strip()]
