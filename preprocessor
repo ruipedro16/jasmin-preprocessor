@@ -7,6 +7,7 @@ import sys
 import pprint
 
 import argparse
+from argparse import Namespace
 
 import utils
 from generic_fn import GenericFn
@@ -22,7 +23,7 @@ python3 preprocessor --input_file test_shake256_32_64.jpp --output_file test_sha
 """
 
 
-def parse_args():
+def parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
 
     parser.add_argument(
@@ -46,6 +47,30 @@ def parse_args():
         action="store_true",  # Makes -d a flag without an argument
     )
 
+    parser.add_argument(
+        "--after_macro",
+        help="Prints the program after replacing #expand macros",
+        action="store_true",  # Makes a flag without an argument
+    )
+
+    parser.add_argument(
+        "--after_rm_generic",
+        help="Prints the program after removing the generic functions from the source code",
+        action="store_true",  # Makes a flag without an argument
+    )
+
+    parser.add_argument(
+        "--after_tasks",
+        help="Prints the program after resolving the tasks",
+        action="store_true",  # Makes a flag without an argument
+    )
+
+    parser.add_argument(
+        "--after_generic_fn_calls",
+        help="Prints the program after resolving generic function calls",
+        action="store_true",  # Makes a flag without an argument
+    )
+
     parser.add_argument("--task", required=False, nargs="+")
 
     return parser.parse_args()
@@ -55,7 +80,7 @@ def resolve_templates(
     text: str,
     global_params: dict[str, int],
     generic_fn_dict: dict[str, GenericFn],
-    debug: bool,
+    args: Namespace,
 ) -> str:
     """
     Resolves templates in the source code.
@@ -79,6 +104,10 @@ def resolve_templates(
     text = utils.remove_typed_generic_fn_text(text)
     text = utils.remove_generic_fn_text(text)
 
+    if args.after_rm_generic:
+        print(text)
+        sys.exit(0)
+
     # 4th step: Replace calls to generic functions with calls to concrete functions
     text = utils.replace_typed_generic_calls_with_concrete(text, global_params)
     text = utils.replace_generic_calls_with_concrete(text, global_params)
@@ -93,7 +122,7 @@ def resolve_templates(
         + utils.get_typed_fn_tasks(input_text, global_params)
     )
 
-    if debug:
+    if args.debug:
         print("Tasks [1st pass]:")
         pprint.pprint(tasks)
         print("\n", end="")
@@ -102,7 +131,7 @@ def resolve_templates(
         subtasks = task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
         tasks.extend(subtasks)
 
-    if debug:
+    if args.debug:
         print("Tasks [2nd pass (includes subtasks)]:")
         pprint.pprint(tasks)
         print("\n", end="")
@@ -110,7 +139,7 @@ def resolve_templates(
     # Remove duplicate tasks
     tasks = utils.remove_duplicates(tasks)
 
-    if debug:
+    if args.debug:
         print("Tasks [3rd pass (removes duplicate tasks)]:")
         pprint.pprint(tasks)
         print("\n", end="")
@@ -122,8 +151,16 @@ def resolve_templates(
     for task in tasks:
         text = task.resolve(text, generic_fn_dict, typed_generic_fn_dict)
 
+    if args.after_tasks:
+        print(text)
+        sys.exit(0)
+
     # 7th step: Resolve generic function calls that were not resolved before
     text = utils.resolve_generic_fn_calls(text, global_params)
+
+    if args.after_generic_fn_calls:
+        print(text)
+        sys.exit(0)
 
     # Last step: Remove extra blank space & remove auxiliary comments
     pattern = r"// Place concrete instances of the (\w+) function here"
@@ -139,7 +176,7 @@ def resolve_templates(
 
 
 if __name__ == "__main__":
-    args = parse_args()
+    args: Namespace = parse_args()
 
     if args.debug:
         print(f"Args.task: {args.task}")
@@ -166,7 +203,7 @@ if __name__ == "__main__":
     if args.debug:
         print('Text after macro replacement')
         print(text, end='\n\n')
-        
+
     # 2nd step: Get generic functions dict from Jasmin source code
     generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
 
@@ -194,9 +231,12 @@ if __name__ == "__main__":
         input_text: str = f.read()
 
     input_text = utils.replace_expand_macros(input_text)
+    if args.after_macro:
+        print(text)
+        sys.exit(0)
 
     output_text: str = resolve_templates(
-        input_text, global_params, generic_fn_dict, args.debug
+        input_text, global_params, generic_fn_dict, args
     )
     output_text += "\n"
 
