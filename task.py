@@ -22,13 +22,13 @@ class Task:
     """
 
     def __init__(
-        self,
-        fn_name: str,
-        template_params: list[str],
-        global_params: dict[str, int],
-        # unless specified otherwise, a task is considered to be a simple generic function (i.e. not typed)
-        typed_fn_names: list[str] = None,
-        typed_fn_types: list[str] = None,
+            self,
+            fn_name: str,
+            template_params: list[str],
+            global_params: dict[str, int],
+            # unless specified otherwise, a task is considered to be a simple generic function (i.e. not typed)
+            typed_fn_names: list[str] = None,
+            typed_fn_types: list[str] = None,
     ):
         self.fn_name = fn_name
         self.template_params = template_params
@@ -55,15 +55,15 @@ class Task:
 
         if self.is_typed_task and other.is_typed_task:
             return (
-                self.fn_name == other.fn_name
-                and template_params_int_self == template_params_int_other
-                and self.typed_fn_names == other.typed_fn_names
-                and self.typed_fn_types == other.typed_fn_types
+                    self.fn_name == other.fn_name
+                    and template_params_int_self == template_params_int_other
+                    and self.typed_fn_names == other.typed_fn_names
+                    and self.typed_fn_types == other.typed_fn_types
             )
         elif (not self.is_typed_task) and (not other.is_typed_task):
             return (
-                self.fn_name == other.fn_name
-                and template_params_int_self == template_params_int_other
+                    self.fn_name == other.fn_name
+                    and template_params_int_self == template_params_int_other
             )
         else:
             return False
@@ -76,11 +76,18 @@ class Task:
         params_str = ", ".join(str(param) for param in self.template_params)
         return f"Task(fn_name='{self.fn_name}', params=[{params_str}], typed_fn_names={self.typed_fn_names}, typed_fn_types={self.typed_fn_types})"
 
+    def is_valid(self) -> bool:
+        if self.is_typed_task:
+            return self.fn_name != '' and self.template_params != [] and self.typed_fn_names != [] and list(
+                self.typed_fn_types) != [] # TODO: FIXME: support tasks without typed_fn_name or without typed_fn_types
+        else:
+            return self.fn_name != '' and self.template_params != []
+
     def resolve(
-        self,
-        text: str,
-        generic_fn_dict: dict[str, GenericFn],
-        typed_generic_fn_dict: dict[str, TypedGenericFn],
+            self,
+            text: str,
+            generic_fn_dict: dict[str, GenericFn],
+            typed_generic_fn_dict: dict[str, TypedGenericFn],
     ) -> str:
         """
         Resolve the function and return the concrete definition
@@ -114,17 +121,17 @@ class Task:
         return re.sub(
             pattern,
             lambda match: match.group()
-            + "\n"
-            + utils.build_concrete_fn(generic_fn, replacement_dict, self.is_typed_task)
-            + "\n",
+                          + "\n"
+                          + utils.build_concrete_fn(generic_fn, replacement_dict, self.is_typed_task)
+                          + "\n",
             text,
         )
 
     def get_sub_tasks(
-        self,
-        generic_fn_dict: dict[str, GenericFn],
-        typed_generic_fn_dict: [str, TypedGenericFn],
-        context_params: dict[str, int] = None,
+            self,
+            generic_fn_dict: dict[str, GenericFn],
+            typed_generic_fn_dict: [str, TypedGenericFn],
+            context_params: dict[str, int] = None,
     ) -> list["Task"]:
         """
         Get the sub-tasks for the current task by resolving nested generic function calls.

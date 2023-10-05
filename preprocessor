@@ -115,6 +115,9 @@ def resolve_templates(
         pprint.pprint(tasks)
         print("\n", end="")
 
+    # See if there is any invalid task
+    utils.validate_tasks(tasks)
+
     # 6th step: Resolve each task
     for task in tasks:
         text = task.resolve(text, generic_fn_dict, typed_generic_fn_dict)

@@ -1,4 +1,5 @@
 import re
+import sys
 
 from generic_fn import GenericFn
 from task import Task
@@ -497,3 +498,9 @@ def replace_expand_macros(text: str) -> str:
         text = text.replace(f"{key}", str(value))
 
     return text
+
+def validate_tasks(tasks: list[Task]):
+    for task in tasks:
+        if not task.is_valid():
+            sys.stderr.write(f'Invalid task: {task}\n')
+            sys.exit(1)
