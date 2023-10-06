@@ -109,9 +109,9 @@ def resolve_templates(
         sys.exit(0)
 
     # 4th step: Replace calls to generic functions with calls to concrete functions
-    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)
+    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)    
     text = utils.replace_generic_calls_with_concrete(text, global_params)
-
+    
     # 5th step: Get a list of all the tasks that need to be done
     # First, we gather the tasks without handling nested calls, and then, after all
     # the tasks are collected, resolve the nested calls in the Task class.

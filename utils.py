@@ -260,7 +260,7 @@ def replace_generic_calls_with_concrete(
 
         return concrete_call
 
-    pattern = r"(\w+)<([^>]+)>"
+    pattern = r"(\w+)<(.+)>"
     return re.sub(pattern, replace_fn, text)
 
 
