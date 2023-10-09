@@ -1,0 +1,79 @@
+inline fn foo(reg u32 a, reg u64 b) -> reg u8 {
+  reg u8 r;
+  r = 1;
+  return r;
+}
+
+inline fn __mapto2<N, ITER>[F;TYPE_R,TYPE_A,TYPE_B](
+  reg ptr TYPE_R[N] r,
+  const reg ptr TYPE_A[N] a,
+  const reg ptr TYPE_B[N] b)
+  ->
+  reg ptr TYPE_R[N]
+{
+  reg u32 i;
+  inline int j;
+  reg TYPE_R elem_r;
+  reg TYPE_A elem_a;
+  reg TYPE_B elem_b;
+
+  i = 0;
+  while(i < (N / ITER) )
+  {
+    for j=0 to ITER
+    {
+      elem_a = a[(int) i];
+      elem_b = b[(int) i];
+      elem_r = F(elem_a, elem_b);
+      r[(int) i] = elem_r;
+      i += 1;
+    }
+  }
+
+  for j=0 to (N % ITER)
+  {
+    elem_a = a[(int) i];
+    elem_b = b[(int) i];
+    elem_r = F(elem_a, elem_b);
+    r[(int) i] = elem_r;
+    i += 1;
+  }
+
+  return r;
+}//<>
+
+export fn test(reg u64 _a) {
+    stack u32[4] a;
+    stack u64[4] b;
+    stack u8[4] c;
+
+    reg ptr u32[4] ap;
+    reg ptr u64[4] bp;
+    reg ptr u8[4] cp;
+
+    inline int i;
+    reg u32 t;
+
+    for i = 0 to 4 {
+        t = (32u)[_a + 4 * i];
+        a[i] = t;
+    }
+    
+    b[0] = 1; b[1] = 2; b[2] = 3; b[3] = 4;
+    c[0] = 1; c[1] = 2; c[2] = 3; c[3] = 4;
+
+    ap = a;
+    bp = b;
+    cp = c;
+
+    cp = __mapto2<4,2>[foo;u8,u32,u64](cp, ap, bp);
+
+    a = ap;
+    b = bp;
+    c = cp;
+
+    for i = 0 to 4 {
+        t = a[i];
+        (u32)[_a + 4 * i] = t;
+    }
+}

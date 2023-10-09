@@ -11,8 +11,8 @@ class TypedGenericFn:
         params: str,
         args: str,
         fn_body: str,
-        generic_fn_names: str,
-        generic_fn_types: str,
+        generic_fn_names: list[str],
+        generic_fn_types: list[str],
     ):
         self.annotation = annotation
         self.fn_name = fn_name

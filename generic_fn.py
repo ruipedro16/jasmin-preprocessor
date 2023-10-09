@@ -7,7 +7,8 @@ class GenericFn:
         fn_name (str): The name of the function.
         params (list[str]): A string representing the generic parameters enclosed in angle brackets.
         args (str): A string representing the generic arguments provided when calling the function.
-        fn_body (str): The body of the generic function. May contain calls to other generic functions. Also contains the return type
+        fn_body (str): The body of the generic function. May contain calls to other generic ~
+                       functions. Also contains the return type
     """
 
     def __init__(
