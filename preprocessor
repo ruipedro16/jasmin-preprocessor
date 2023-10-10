@@ -21,6 +21,9 @@ import pprint
 import argparse
 from argparse import Namespace
 
+import multiprocessing
+import concurrent.futures
+
 import utils
 from generic_fn import GenericFn
 from task import Task
@@ -29,8 +32,7 @@ from typed_generic_fn import TypedGenericFn
 
 def parse_args() -> Namespace:
     """Parse CLI arguments"""
-    parser = argparse.ArgumentParser(
-        description="Jasmin source code preprocessor")
+    parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
 
     parser.add_argument(
         "--input_file",
@@ -78,6 +80,13 @@ def parse_args() -> Namespace:
     )
 
     parser.add_argument("--task", required=False, nargs="+")
+
+    parser.add_argument(
+        "--workers",
+        help="Number of worker threads for finding subtask concurrently",
+        type=int,
+        required=False,
+    )
 
     return parser.parse_args()
 
@@ -140,9 +149,29 @@ def resolve_templates(
         pprint.pprint(tasks)
         print("\n", end="")
 
-    for task in tasks:
-        subtasks = task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
-        tasks.extend(subtasks)
+    max_workers: int = args.workers if args.workers is not None else multiprocessing.cpu_count()
+    if args.debug:
+        print(f"# Workers: {max_workers}")
+
+        # Create a ThreadPoolExecutor
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit tasks to the executor concurrently
+        futures = [
+            executor.submit(utils.find_subtasks, task, generic_fn_dict, typed_generic_fn_dict)
+            for task in tasks
+        ]
+
+        # Wait for all tasks to complete
+        concurrent.futures.wait(futures)
+
+        # Get results from the completed tasks
+        subtasks = [future.result() for future in futures]
+
+    tasks.extend(subtask for sublist in subtasks for subtask in sublist)
+
+    # for task in tasks:
+    #    subtasks = task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
+    #    tasks.extend(subtasks)
 
     if args.debug:
         print("Tasks [2nd pass (includes subtasks)]:")
@@ -196,8 +225,7 @@ if __name__ == "__main__":
 
     # Check if the input files exists
     if not os.path.exists(args.input_file):
-        sys.stderr.write(
-            f"Error: The file '{args.input_file}' does not exist.\n")
+        sys.stderr.write(f"Error: The file '{args.input_file}' does not exist.\n")
         sys.exit(-1)
 
     with open(args.input_file, "r", encoding="utf-8") as f:
@@ -222,8 +250,7 @@ if __name__ == "__main__":
     generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
 
     # 2.5 step: Get typed generic functions dict from Jasmin source code
-    typed_generic_fn_dict: dict[str,
-                                TypedGenericFn] = utils.get_typed_generic_fn_dict(text)
+    typed_generic_fn_dict: dict[str, TypedGenericFn] = utils.get_typed_generic_fn_dict(text)
 
     export_tasks: list[Task] = utils.parse_tasks(args.task, global_params)
     if args.debug:

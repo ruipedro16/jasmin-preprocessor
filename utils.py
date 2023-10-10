@@ -535,3 +535,11 @@ def validate_tasks(tasks: list[Task]):
         if not task.is_valid():
             sys.stderr.write(f'Invalid task: {task}\n')
             sys.exit(1)
+
+
+def find_subtasks(
+    task: Task,
+    generic_fn_dict: dict[str, GenericFn],
+    typed_generic_fn_dict: dict[str, TypedGenericFn],
+):
+    return task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
