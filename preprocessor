@@ -149,11 +149,15 @@ def resolve_templates(
         pprint.pprint(tasks)
         print("\n", end="")
 
-    max_workers: int = args.workers if args.workers is not None else multiprocessing.cpu_count()
+    try:
+        default_workers: int = multiprocessing.cpu_count()
+    except NotImplementedError:
+        default_workers: int = 1
+
+    max_workers: int = args.workers if args.workers is not None else default_workers
     if args.debug:
         print(f"# Workers: {max_workers}")
 
-        # Create a ThreadPoolExecutor
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit tasks to the executor concurrently
         futures = [
@@ -165,9 +169,12 @@ def resolve_templates(
         concurrent.futures.wait(futures)
 
         # Get results from the completed tasks
-        subtasks = [future.result() for future in futures]
+        subtasks: list[list[Task]] = [future.result() for future in futures]
 
-    tasks.extend(subtask for sublist in subtasks for subtask in sublist)
+    # new_tasks: list[Task] = [subtask for sublist in subtasks for subtask in sublist]
+    new_tasks: list[Task] = utils.flatten(subtasks)
+
+    tasks.extend(new_tasks)
 
     # for task in tasks:
     #    subtasks = task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)

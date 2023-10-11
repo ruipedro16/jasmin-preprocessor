@@ -5,11 +5,16 @@ from generic_fn import GenericFn
 from task import Task
 from typed_generic_fn import TypedGenericFn
 
-from typing import cast, Any
+from itertools import chain
+from typing import cast, Any, TypeVar
 
 
-# TODO: FIX Any
-def eval_list(input_list: list[Any], eval_dict: dict[str, int]):
+def flatten(input_list: list[list[Any]]) -> list[Any]:
+    return list(chain(*input_list))
+
+
+T = TypeVar("T", str, int)
+def eval_list(input_list: list[T], eval_dict: dict[str, int]) -> list[T]:
     res = []
     for v in input_list:
         try:
@@ -36,9 +41,10 @@ def remove_duplicates(input_list: list[Any]) -> list[Any]:
     Returns:
         list[T]: A new list with duplicates removed.
     """
-    if not hasattr(input_list[0].__class__, '__eq__'):
+    if not hasattr(input_list[0].__class__, "__eq__"):
         raise TypeError(
-            "Elements in the input list must implement the __eq__ method.")
+            "Elements in the input list must implement the __eq__ method."
+        )
 
     res = []
 
@@ -119,7 +125,9 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"([#\[\]\"=\w]+)?\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    pattern = (
+        r"([#\[\]\"=\w]+)?\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    )
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
@@ -132,8 +140,10 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
             # print(f"Fn Body: {fn_body}")
             # print("---------------", end="\n\n")
 
-            annotation = annotation.strip()
-            if "#" in annotation:
+            annotation = (
+                annotation.strip() if annotation is not None else annotation
+            )
+            if annotation is not None and "#" in annotation:
                 annotation += "\n"
 
             generic_fn = GenericFn(annotation, fn_name, params, args, fn_body)
@@ -152,7 +162,14 @@ def get_typed_generic_fn_dict(input_text: str) -> dict[str, TypedGenericFn]:
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
-            annotation, fn_name, params, typed_params, args, fn_body = match.groups()
+            (
+                annotation,
+                fn_name,
+                params,
+                typed_params,
+                args,
+                fn_body,
+            ) = match.groups()
             typed_fn_names: list[str] = typed_params.split(";")[0].split(",")
             typed_fn_type: list[str] = [
                 t.strip() for t in typed_params.split(";")[-1].split(",")
@@ -333,8 +350,9 @@ def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
 
     def replace_fn(match) -> str:
         fn_name, generic_params, generic_args = match.groups()
-        generic_params: list[str] = [p.strip()
-                                     for p in generic_params.split(",")]
+        generic_params: list[str] = [
+            p.strip() for p in generic_params.split(",")
+        ]
         concrete_params = {}
 
         for param in generic_params:
@@ -363,7 +381,8 @@ def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
 
 
 def replace_parameters_in_string(
-        text: str, replacement_dict: dict[str, int]) -> str:
+    text: str, replacement_dict: dict[str, int]
+) -> str:
     """_
     Auxiliary function to replace the parameters with their value
     """
@@ -471,11 +490,9 @@ def get_typed_fn_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
 
     return [  # We only return the tasks that can be solved right away. We look for subtasks later
         Task(
-            fn_name,
-            list(params),
-            global_params,
-            typed_fn_names,
-            typed_fn_types)
+            fn_name, list(
+                params), global_params, typed_fn_names, typed_fn_types
+        )
         for fn_name, params, typed_fn_names, typed_fn_types in tasks
         if all(param.isdigit() for param in params)
     ]
@@ -533,7 +550,7 @@ def replace_expand_macros(text: str) -> str:
 def validate_tasks(tasks: list[Task]):
     for task in tasks:
         if not task.is_valid():
-            sys.stderr.write(f'Invalid task: {task}\n')
+            sys.stderr.write(f"Invalid task: {task}\n")
             sys.exit(1)
 
 
@@ -541,5 +558,5 @@ def find_subtasks(
     task: Task,
     generic_fn_dict: dict[str, GenericFn],
     typed_generic_fn_dict: dict[str, TypedGenericFn],
-):
+) -> list[Task]:
     return task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
