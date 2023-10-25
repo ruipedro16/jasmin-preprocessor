@@ -1,0 +1,28 @@
+name: Pytype Check
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  pytype:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.10.12
+
+    - name: Install Pytype
+      run: |
+        pip install pytype
+        pytype --version
+
+    - name: Run Pytype
+      run: |
+        pytype pytype.toml preprocessor *.py

@@ -80,8 +80,16 @@ def parse_tasks(text: list[str], global_params: dict[str, int]) -> list[Task]:
     if text is None:
         return []
 
+    pattern = r'fn:[^ ]+\s+(\s*p:[^ ]+:\d+)+'
+
     res: list[Task] = []
     for s in text:
+        if not re.match(pattern, s):
+            sys.stderr.write("Invalid format for task\n")
+            sys.stderr.write("Format should be fn:<function name> p:<parameter name>:parameter value\n")
+            sys.stderr.write("Example: fn:shake256  p:OUTLEN:64 p:INLEN:64")
+            sys.exit(-1)
+
         fields: list[str] = s.split()
         params: dict[str, int] = {}
         fn_name: str = fields[0].split(":")[-1]
