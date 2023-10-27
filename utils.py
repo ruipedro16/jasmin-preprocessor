@@ -339,7 +339,7 @@ def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
     This function also replaces generic function calls with calls to the concrete functions
     """
     tasks = set()
-    generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
+    generic_fn_call_pattern = r"(\w+)<(.+)>\(([^)]+)\);"
 
     def replace_fn(match) -> str:
         fn_name, generic_params, generic_args = match.groups()
