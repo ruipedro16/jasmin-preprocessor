@@ -20,6 +20,6 @@ export fn test() {
     reg u32 d e f;
     reg bool b1 b2;
     
-    b1 = __cond_a_below_b_and_a_below_c[u64;64](a, b, c);
-    b2 = __cond_a_below_b_and_a_below_c[u32;32](d, e, f);
+    b1 = __cond_a_below_b_and_a_below_c<123>[u64;64](a, b, c);
+    b2 = __cond_a_below_b_and_a_below_c<123>[u32;32](d, e, f);
 }
