@@ -1,24 +1,16 @@
 # jasmin-preprocessor
 
-Run:
-
-> $ ./preprocessor [-d] --input_file <input_file> --output_file <output_file>
-
-## Preprocessor options
-
-- `-d`/`--debug`: Prints debugging information
-- `--after_macro`: Prints the program after replacing `#expand` macros
-- `--after_rm_generic`: Prints the program after removing the generic functions from the source code
-- `--after_tasks`: Prints the program after resolving the tasks
-- `--after_generic_fn_calls`: Prints the program after resolving generic function calls
-- `--workers`: Defines the number of worker threads for finding subtask concurrently
-
-## Run with Docker
+Fails with functions that have parenthesis in the arguments. For example
 
 ```
-# Build the Docker image
-docker build -t jasmin-preprocessor .
-
-# Run the container
-docker run -it -v "$PWD":/app jasmin-preprocessor --input_file map.jazz --output_file map.jpp
+offset = (64u) h;
+auth_path, _ = _x_memcpy_u8u8<SPX_N*SPX_FORS_HEIGHT, SPX_N>(auth_path, offset, current[SPX_N:SPX_N]);
 ```
+
+works, but
+
+```
+auth_path, _ = _x_memcpy_u8u8<SPX_N*SPX_FORS_HEIGHT, SPX_N>(auth_path, (64u) h, current[SPX_N:SPX_N]);
+```
+
+doesn't
