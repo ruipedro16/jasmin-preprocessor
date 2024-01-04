@@ -80,16 +80,8 @@ def parse_tasks(text: list[str], global_params: dict[str, int]) -> list[Task]:
     if text is None:
         return []
 
-    pattern = r'fn:[^ ]+\s+(\s*p:[^ ]+:\d+)+'
-
     res: list[Task] = []
     for s in text:
-        if not re.match(pattern, s):
-            sys.stderr.write("Invalid format for task\n")
-            sys.stderr.write("Format should be fn:<function name> p:<parameter name>:parameter value\n")
-            sys.stderr.write("Example: fn:shake256  p:OUTLEN:64 p:INLEN:64")
-            sys.exit(-1)
-
         fields: list[str] = s.split()
         params: dict[str, int] = {}
         fn_name: str = fields[0].split(":")[-1]
@@ -339,7 +331,7 @@ def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
     This function also replaces generic function calls with calls to the concrete functions
     """
     tasks = set()
-    generic_fn_call_pattern = r"(\w+)<(.+)>\(([^)]+)\);"
+    generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
 
     def replace_fn(match) -> str:
         fn_name, generic_params, generic_args = match.groups()
@@ -401,6 +393,8 @@ def build_concrete_fn(
         # suppress pytype warning
         generic_fn = cast(TypedGenericFn, generic_fn)
 
+        print("Handling typed task")
+
         tmp = replace_parameters_in_string(
             "_".join(generic_fn.generic_fn_names)
             + "_"
@@ -409,6 +403,9 @@ def build_concrete_fn(
             + "_".join(generic_fn.params),
             replacement_dict,
         )
+
+    if generic_fn.annotation is None:
+        generic_fn.annotation = ""
 
     if generic_fn.annotation == "":
         res = f"fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
