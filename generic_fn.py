@@ -19,11 +19,11 @@ class GenericFn:
         args: str,
         fn_body: str,
     ):
-        self.annotation = annotation
-        self.fn_name = fn_name
-        self.params = [p.strip() for p in params.split(",")]
-        self.args = args
-        self.fn_body = fn_body
+        self.annotation: str = annotation
+        self.fn_name: str = fn_name
+        self.params: list[str] = [p.strip() for p in params.split(",")]
+        self.args: str = args
+        self.fn_body: str = fn_body
 
     def __repr__(self) -> str:
         return (

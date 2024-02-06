@@ -1,0 +1,25 @@
+inline fn add_1(reg u8 x) -> reg u8 { x += 1; return x; }
+
+inline fn map_add_1_4(reg ptr u8[4] a) -> reg ptr u8[4] {
+    inline int i;
+    reg u8 t;
+
+    for i=0 to 4 { t = a[i]; t = add_1(t); a[i] = t; }
+
+    return a;
+}
+
+export fn map_add1_4(reg u64 _a) {
+    stack u8[4] a;
+    reg ptr u8[4] ap;
+
+    inline int i;
+    reg u8 t;
+
+    for i=0 to 4 { t = (u8)[_a + i]; a[i] = t; }
+
+    ap = a;
+    ap = map_add_1_4(ap);
+
+    for i=0 to 4 { t = a[i]; (u8)[_a + i] = t; }
+}

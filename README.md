@@ -2,7 +2,7 @@
 
 Run:
 
-> $ ./preprocessor [-d] --input_file <input_file> --output_file <output_file>
+> $ ./preprocessor [-d] -in <input_file> -out <output_file>
 
 ## Preprocessor options
 
@@ -22,3 +22,19 @@ docker build -t jasmin-preprocessor .
 # Run the container
 docker run -it -v "$PWD":/app jasmin-preprocessor --input_file map.jazz --output_file map.jpp
 ```
+
+## Integer Templates
+
+Sphincs+ implementation
+
+## Functions as Arguments
+
+## Recursive Functions
+
+## JPP
+
+TODO: 
+
+## TODO
+
+Macros like C `#if`, `#ifdef`
