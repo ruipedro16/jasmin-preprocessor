@@ -1,0 +1,25 @@
+// from https://github.com/jasmin-lang/jasmin/blob/main/compiler/tests/success/arm-m4/memcmp.jazz
+export fn memcmp(reg usize p q n) -> reg usize {
+    reg usize res i;
+    reg usize a b;
+    reg bool z;
+
+    res = 1;
+    i = 0;
+
+    while (i < n) {
+    a = [p];
+    b = [q];
+
+    if (a != b) {
+    res = 0;
+    }
+
+    p += 4;
+    q += 4;
+    i += 1;
+    }
+
+    res = res;
+    return res;
+}
