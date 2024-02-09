@@ -1,0 +1,163 @@
+// Same as
+//
+// sumWithAccumulator :: Num a => [a] -> a -> a
+// sumWithAccumulator [] acc = acc
+// sumWithAccumulator (x:xs) acc = sumWithAccumulator xs (acc + x)
+
+// sumList :: Num a => [a] -> a
+// sumList xs = sumWithAccumulator xs 0
+
+// The base case is the array with 1 element
+inline fn sum_array_1(reg ptr u64[1] a, reg u64 acc) -> reg u64 {
+    reg u64 t;
+
+    t = a[0];
+
+    acc = acc;
+    acc += t;
+    acc = acc;
+
+    return acc;
+}
+
+inline fn sum_array_2(reg ptr u64[2] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[2 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 2 - 1];
+    sum_tail = sum_array_1(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_3(reg ptr u64[3] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[3 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 3 - 1];
+    sum_tail = sum_array_2(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_4(reg ptr u64[4] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[4 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 4 - 1];
+    sum_tail = sum_array_3(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_5(reg ptr u64[5] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[5 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 5 - 1];
+    sum_tail = sum_array_4(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_6(reg ptr u64[6] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[6 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 6 - 1];
+    sum_tail = sum_array_5(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_7(reg ptr u64[7] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[7 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 7 - 1];
+    sum_tail = sum_array_6(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_8(reg ptr u64[8] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[8 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 8 - 1];
+    sum_tail = sum_array_7(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_9(reg ptr u64[9] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[9 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 9 - 1];
+    sum_tail = sum_array_8(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+inline fn sum_array_10(reg ptr u64[10] a, reg u64 acc) -> reg u64 {
+    reg u64 sum_tail;
+    reg ptr u64[10 - 1] tail;
+
+    sum_tail = sum_tail; acc = acc;
+    tail = a[1 : 10 - 1];
+    sum_tail = sum_array_9(tail, acc);
+    sum_tail = sum_tail; acc = acc;
+
+    acc += sum_tail;
+
+    return acc;
+}
+
+export fn sum_rec(reg u64 _a) -> reg u64 {
+    inline int i;
+    reg u64 t acc sum;
+
+    stack u64[10] a;
+    reg ptr u64[10] ap;
+
+    for i=0 to 10 { t = (u64) [_a + 8*i]; a[i] = t; }
+
+    ?{}, acc = #set0();
+    ap = a;
+    sum = sum_array_10(ap, acc);
+
+    return sum;
+}

@@ -1,3 +1,4 @@
+import pprint
 import sys
 import re
 
@@ -6,6 +7,8 @@ from typing import Optional
 import utils
 from env import Env
 from generic_fn import GenericFn
+
+from io import StringIO
 
 
 class Task:
@@ -21,13 +24,22 @@ class Task:
     """
 
     def __init__(self, fn_name: str, template_params: list[int], env: Env):
-        self.fn_name: str = fn_name
+        self.fn_name: str = fn_name  # Name of the generic function. Not the name of the resolved function I think (?)
         self.template_params: list[int] = template_params
         self.env: Env = env
 
     def __repr__(self) -> str:
-        # TODO:
-        pass
+        template_params_buf: StringIO = StringIO()
+        pprint.pprint(self.template_params, stream=template_params_buf)
+        template_params_str: str = template_params_buf.getvalue()
+
+        return (
+            f"Function name: {self.fn_name}" f"Template parameters: {template_params_str}" f"Environment: {self.env}",
+        )
+
+    def get_resolved_fn_name(self) -> str:
+        template_params_str: list[str] = [str(param) for param in self.template_params]
+        return f"{self.fn_name}_" + "_".join(template_params_str)
 
     def __eq__(self, other: object):
         if not isinstance(other, Task):
@@ -57,7 +69,7 @@ class Task:
         """
         pattern = rf"// Place concrete instances of the {self.fn_name} function here"
 
-        generic_fn: GenericFn = None
+        generic_fn: Optional[GenericFn] = None
         try:
             generic_fn = env.generic_functions[self.fn_name]
         except KeyError:
@@ -85,11 +97,11 @@ class Task:
         """
         subtasks: list["Task"] = []
 
-        generic_fn: GenericFn = None
+        generic_fn: Optional[GenericFn] = None
 
         # TODO: FIXME: PEercebi 0 deste if
         function_name = self.fn_name
-        if context_params is not None:
+        if context_params is not None:  # If we are not in the first iteration
             try:
                 function_name = eval(self.fn_name, {}, context_params)
                 print(f"Name: {function_name}")
@@ -99,9 +111,7 @@ class Task:
         try:
             generic_fn = env.generic_functions[function_name]
         except KeyError:
-            sys.stderr.write(
-                f"Could not find {self.fn_name} in generic_fn_dict/typed_generic_fn_dict in Task.get_sub_tasks [2]\n"
-            )
+            sys.stderr.write(f"Could not find {self.fn_name} in generic_fn_dict in Task.get_sub_tasks [2]\n")
             sys.exit(-1)
 
         resolved_fn_body: str = self.resolve(generic_fn.fn_body, env)
@@ -110,59 +120,83 @@ class Task:
         if context_params is None:
             context_params = dict(zip(generic_fn.params, self.template_params))
 
+            # FIXME: I think these next 2 lines are not needed
             tmp = dict(zip(generic_fn.params, self.template_params))
             context_params.update(tmp)
 
+        # Find nested generic function calls
         generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
         for match in re.finditer(generic_fn_call_pattern, resolved_fn_body):
             fn_name, generic_params, _ = match.groups()
 
-            # FIXME: TODO: Add support for generic functions
-            if fn_name == self.fn_name:
+            # If the function already exists, we don't generate it
+            # This is to support recursive functions. The base case is written in "standard jasmin"
+            # and the inductive case is written in "high level jasmin"
+            # if fn_name in env.functions:
+            #    continue  # Skip to the next iteration
+            """
+            if fn_name == self.target_fn_name:
                 sys.stderr.write(f"Recursive functions not supported: {self.fn_name}\n")
                 sys.exit(-1)
+            """
 
             generic_params: list[str] = [p.strip() for p in generic_params.split(",")]
 
             for param in generic_params:
+                # If the parameter exists, we recompute it regardless.
+                # This is stupid but we need it to support recursive functions
+                try:
+                    _ = context_params.pop(param)
+                except KeyError:
+                    pass
+
                 try:
                     # Context params may override global params
-                    context_params[param] = int(context_params[param])
+                    context_params[param] = int(context_params[param])  # Nao percebi
                 except KeyError:
                     try:
-                        context_params[param] = context_params.get(param, self.global_params[param])
+                        # get param from context_params else the default value is env.global_params[param]
+                        context_params[param] = context_params.get(param, env.global_params[param])
                     except KeyError:
                         template_params_int: list[int] = [int(val) for val in self.template_params]
+
                         template_dict: dict[str, int] = dict(
                             zip(
                                 env.generic_functions[self.fn_name].params,
                                 template_params_int,
                             )
                         )  # TODO: handle key error
+
                         context_params[param] = eval(
                             param.replace("/", "//"),
                             {},
                             {
-                                **self.global_params,
+                                **env.global_params,
                                 **context_params,
                                 **template_dict,
                             },
                         )
+
                     except Exception:
-                        sys.stderr.write("Could not evaluate parameter: {param}")
+                        sys.stderr.write(f"Could not evaluate parameter: {param}\n")
 
             concrete_args: list[int] = [int(context_params.get(p, p)) for p in generic_params]
+
             subtask = Task(fn_name, concrete_args, env)
             subtasks.append(subtask)
 
         # Recursive step: Find and collect sub-tasks from the resolved function body
         replacement_dict: dict[str, int] = dict(zip(generic_fn.params, self.template_params))
 
+        # Recursive functions: Check if any subtask corresponds to a base case already defined in "standard" jasmin.
+        # If so, we remove that task
+        subtasks = [subtask for subtask in subtasks if subtask.get_resolved_fn_name() not in env.functions]
+
         for subtask in subtasks:
             sub_subtasks = subtask.get_sub_tasks(
                 env,
                 {
-                    **self.global_params,
+                    **env.global_params,
                     **context_params,
                     **replacement_dict,
                 },  # Pass resolved_params_local in the recursion

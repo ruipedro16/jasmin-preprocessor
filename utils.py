@@ -5,11 +5,13 @@ import multiprocessing
 import concurrent.futures
 
 from itertools import chain
-from typing import cast, Any, TypeVar
+from typing import Any
 
 from generic_fn import GenericFn
 from task import Task
 from env import Env
+
+import regex
 
 
 def get_params(code: str) -> dict[str, int]:
@@ -46,7 +48,7 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"([#\[\]\"=\w]+)?\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
+    pattern = regex.GENERIC_FUNCTION_REGEX
 
     if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
         for match in matches:
@@ -69,9 +71,10 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     return res
 
 
-def get_functions(text: str) -> list[str]:
-    # TODO:
-    return []
+def get_functions_from_source(code: str) -> list[str]:
+    pattern = regex.FUNCTION_REGEX
+    matches = re.findall(pattern, code, re.MULTILINE)
+    return [match[1] for match in matches if not match[0].strip().startswith("export")]
 
 
 def get_global_vars(code: str) -> dict[str, int]:
@@ -140,9 +143,7 @@ def get_tasks(text: str, env: Env) -> list[Task]:
 
     text = re.sub(generic_fn_call_pattern, replace_fn, text)
     return [  # We only return the tasks that can be solved right away. We look for subtasks later
-        Task(fn_name, list(params), env.global_params)
-        for fn_name, params in tasks
-        if all(param.isdigit() for param in params)
+        Task(fn_name, list(params), env) for fn_name, params in tasks if all(param.isdigit() for param in params)
     ]
 
 
