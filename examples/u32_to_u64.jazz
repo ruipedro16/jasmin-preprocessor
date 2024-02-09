@@ -1,0 +1,38 @@
+inline fn __wordsize1_to_wordsize2_3_u64_u32(
+    reg ptr u64[3] out,
+    reg ptr u32[3] in 
+) -> reg ptr u64[3]
+{
+    reg u32 t; // in
+    reg u64 u; // out
+    inline int i;
+
+    for i=0 to 3 {
+        t = in[i];
+        u = (64u) t;
+        out[i] = u;
+    }
+
+    return out;
+}
+
+export fn u32_to_u64_array(reg u64 _a _b _c) {
+    stack u32[3] a;
+    reg ptr u32[3] ap;
+
+    stack u64[3] b;
+    reg ptr u64[3] bp;
+
+    reg u32 t;
+    reg u64 u;
+    inline int i;
+
+    for i=0 to 3 { t = (u32) [_a + 4*i]; a[i] = t; }
+
+    ap = a;
+    bp = b;
+    bp = __wordsize1_to_wordsize2_3_u64_u32(bp, ap);
+    b = bp;
+
+    for i=0 to 3 { u = b[i]; [_b + 8*i] = u; }
+}

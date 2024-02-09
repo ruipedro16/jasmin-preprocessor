@@ -216,9 +216,13 @@ if __name__ == "__main__":
 
         output_text = utils.replace_eval_global_params(output_text, env.global_params)
 
+        # Replace usize
         output_text = output_text.replace(
             "usize", "u64" if args.arch == "x86-64" else "u32" if args.arch == "arm-m4" else output_text
         )
+
+        # Replace casts
+        output_text = utils.replace_casts(output_text)
 
         if args.debug:
             print("\n--------------------------------------------------------------\n")

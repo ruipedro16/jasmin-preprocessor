@@ -1,0 +1,33 @@
+inline fn __memcpy<INLEN,WORD_SIZE>(reg ptr WORD_SIZE[INLEN] dest src) -> reg ptr WORD_SIZE[INLEN] {
+    inline int i;
+    reg WORD_SIZE t;
+
+    for i=0 to INLEN {
+        t = src[i];
+        dest[i] = t;
+    }
+
+    return dest;
+}//<>
+
+export fn memcpy_u8_3(reg u64 _dest _src) {
+    stack u8[3] dest src;
+    reg ptr u8[3] dest_p src_p;
+
+    inline int i;
+    reg u8 t;
+
+    for i=0 to 3 {
+        t = (u8) [_src + i]; src[i] = t;
+    }
+
+    dest_p = dest;
+    src_p = src;
+    
+    dest_p = __memcpy<3,u8>(dest_p, src_p);
+
+    for i=0 to 3 {
+        t = dest[i];
+        (u8) [_dest + i] = t;
+    }
+}

@@ -1,0 +1,38 @@
+inline fn __wordsize1_to_wordsize2<INLEN,WORD_SIZE1,WORD_SIZE2>(
+    reg ptr WORD_SIZE1[INLEN] out,
+    reg ptr WORD_SIZE2[INLEN] in 
+) -> reg ptr WORD_SIZE1[INLEN]
+{
+    reg WORD_SIZE2 t; // in
+    reg WORD_SIZE1 u; // out
+    inline int i;
+
+    for i=0 to INLEN {
+        t = in[i];
+        u = !(WORD_SIZE1) t;
+        out[i] = u;
+    }
+
+    return out;
+}//<>
+
+export fn u32_to_u64_array(reg u64 _a _b _c) {
+    stack u32[3] a;
+    reg ptr u32[3] ap;
+
+    stack u64[3] b;
+    reg ptr u64[3] bp;
+
+    reg u32 t;
+    reg u64 u;
+    inline int i;
+
+    for i=0 to 3 { t = (u32) [_a + 4*i]; a[i] = t; }
+
+    ap = a;
+    bp = b;
+    bp = __wordsize1_to_wordsize2<3,u64,u32>(bp, ap);
+    b = bp;
+
+    for i=0 to 3 { u = b[i]; [_b + 8*i] = u; }
+}

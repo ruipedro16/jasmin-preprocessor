@@ -1,0 +1,33 @@
+inline fn __memcpy_3_u8(reg ptr u8[3] dest src) -> reg ptr u8[3] {
+    inline int i;
+    reg u8 t;
+
+    for i=0 to 3 {
+        t = src[i];
+        dest[i] = t;
+    }
+
+    return dest;
+}
+
+export fn memcpy_u8_3(reg u64 _dest _src) {
+    stack u8[3] dest src;
+    reg ptr u8[3] dest_p src_p;
+
+    inline int i;
+    reg u8 t;
+
+    for i=0 to 3 {
+        t = (u8) [_src + i]; src[i] = t;
+    }
+
+    dest_p = dest;
+    src_p = src;
+    
+    dest_p = __memcpy_3_u8(dest_p, src_p);
+
+    for i=0 to 3 {
+        t = dest[i];
+        (u8) [_dest + i] = t;
+    }
+}

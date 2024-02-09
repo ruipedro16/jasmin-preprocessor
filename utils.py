@@ -13,6 +13,17 @@ from env import Env
 
 import regex
 
+word_sizes: list[str] = ["u8", "u16", "u32", "u64", "u128", "u256"]
+
+cast_replacement_dict: dict[str, str] = {
+    "!(u8)": "(8u)",
+    "!(u16)": "(16u)",
+    "!(u32)": "(32u)",
+    "!(u64)": "(64u)",
+    "!(u128)": "(128u)",
+    "!(u256)": "(256u)",
+}
+
 
 def get_params(code: str) -> dict[str, int]:
     """
@@ -143,7 +154,9 @@ def get_tasks(text: str, env: Env) -> list[Task]:
 
     text = re.sub(generic_fn_call_pattern, replace_fn, text)
     return [  # We only return the tasks that can be solved right away. We look for subtasks later
-        Task(fn_name, list(params), env) for fn_name, params in tasks if all(param.isdigit() for param in params)
+        Task(fn_name, list(params), env)
+        for fn_name, params in tasks
+        if all(param.isdigit() or param in word_sizes for param in params)
     ]
 
 
@@ -362,4 +375,10 @@ def resolve_generic_fn_calls(text: str, env: Env) -> str:
         text,
     )
 
+    return text
+
+
+def replace_casts(text: str) -> str:
+    for key, value in cast_replacement_dict.items():
+        text = text.replace(f"{key}", value)
     return text
