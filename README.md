@@ -2,12 +2,12 @@
 
 Run:
 
-> $ ./preprocessor [-d] -in <input_file> -out <output_file>
+> $ ./preprocessor [-d] [--arch {x86-64,arm-m4}] -in <input_file> -out <output_file>
 
 ## Preprocessor options
 
+- `--arch`: Target architecture (either x86-64 or arm-m4 ; default is x86-64)
 - `-d`/`--debug`: Prints debugging information
-- `--after_macro`: Prints the program after replacing `#expand` macros
 - `--after_rm_generic`: Prints the program after removing the generic functions from the source code
 - `--after_tasks`: Prints the program after resolving the tasks
 - `--after_generic_fn_calls`: Prints the program after resolving generic function calls
@@ -31,9 +31,11 @@ Sphincs+ implementation
 
 ## Recursive Functions
 
-## JPP
+See [rec_sum.jtmpl](examples/rec_sum.jtmpl)
 
-TODO: 
+## usize
+
+See [memcmp.jtmpl](examples/memcmp.jtmpl)
 
 ## TODO
 

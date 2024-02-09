@@ -38,4 +38,4 @@ tex_files:    $(TEX_FILES)
 
 .PHONY: clean
 clean:
-	rm -rf $(JASMIN_FILES) $(ASM_FILES) $(TEX_FILES)
+	rm -rf $(ASM_FILES) $(TEX_FILES)
