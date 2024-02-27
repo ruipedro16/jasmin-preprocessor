@@ -10,9 +10,7 @@ from io import StringIO
 class Env:
     def __init__(self, text: str) -> None:
         self.global_params: dict[str, int] = utils.get_params(text)
-        self.global_vars: dict[str, int] = utils.get_global_vars(
-            text
-        )  # TODO: Not implemented yet (Not sure if this is needed)
+        self.global_vars: dict[str, int] = utils.get_global_vars(text)  # TODO: Not implemented yet
         self.functions: list[str] = utils.get_functions_from_source(text)
         self.generic_functions: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
 
@@ -31,6 +29,6 @@ class Env:
 
         return (
             f"Global Parameters: {global_params_str}"
-            f"Functions (not including export): {functions_str}"
-            f"Generic functions: {generic_functions_str}"
+            f'Functions ["standard" jasmin] (not including export): {functions_str}'
+            f"Generic functions (including high order functions): {generic_functions_str}"
         )

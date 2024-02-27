@@ -36,7 +36,3 @@ See [rec_sum.jtmpl](examples/rec_sum.jtmpl)
 ## usize
 
 See [memcmp.jtmpl](examples/memcmp.jtmpl)
-
-## TODO
-
-Macros like C `#if`, `#ifdef`

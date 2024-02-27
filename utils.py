@@ -59,9 +59,7 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = regex.GENERIC_FUNCTION_REGEX
-
-    if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
+    if matches := re.finditer(regex.GENERIC_FUNCTION_REGEX, input_text, flags=re.MULTILINE):
         for match in matches:
             annotation, fn_name, params, args, fn_body = match.groups()
 
@@ -79,13 +77,50 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
             generic_fn = GenericFn(annotation, fn_name, params, args, fn_body)
             res[fn_name] = generic_fn
 
+    if matches := re.finditer(regex.FUNCTION_AS_ARG_REGEX, input_text, flags=re.MULTILINE):
+        for match in matches:
+            annotation, fn_name, _, params, args, fn_body = match.groups()
+
+            annotation = annotation.strip() if annotation is not None else annotation
+            if annotation is not None and "#" in annotation:
+                annotation += "\n"
+
+            # arguments without the functions
+            new_args = ",".join(filter(lambda s: "fn" not in s, args.split(","))).strip()
+
+            functions: list[str] = []
+            functions_str: list[str] = [s.strip() for s in args.split(",") if "fn" in s]
+
+            for function_str in functions_str:
+                if match := re.search(r"fn (\w+)", function_str):
+                    arg_fn_name = match.group(1)
+                    functions.append(arg_fn_name)
+
+            generic_fn = GenericFn(annotation, fn_name, params, new_args, fn_body, functions)
+            res[fn_name] = generic_fn
+
     return res
 
 
 def get_functions_from_source(code: str) -> list[str]:
     pattern = regex.FUNCTION_REGEX
     matches = re.findall(pattern, code, re.MULTILINE)
-    return [match[1] for match in matches if not match[0].strip().startswith("export")]
+
+    return [match[1] for match in matches if not (match[0].strip().startswith("export") or "fn" in match[2].strip())]
+
+
+def get_high_order_functions_from_source(code: str) -> list[str]:
+    pattern = regex.FUNCTION_REGEX
+    matches = re.findall(pattern, code, re.MULTILINE)
+
+    l1 = [
+        match[1] for match in matches if not (match[0].strip().startswith("export") and "fn" in match[2].strip())
+    ]  # Functions that dont have <>
+
+    # TODO:
+    l2 = []  # Functions that have <>
+
+    return l1 + l2
 
 
 def get_global_vars(code: str) -> dict[str, int]:
@@ -94,6 +129,9 @@ def get_global_vars(code: str) -> dict[str, int]:
     """
     # TODO: Should global arrays be supported ?
     res: dict[str, int] = {}
+
+    # raise NotImplementedError
+
     return res
 
 
@@ -126,7 +164,7 @@ def parse_tasks(text: list[str], env: Env) -> list[Task]:
     return res
 
 
-def get_tasks(text: str, env: Env) -> list[Task]:
+def get_generic_tasks(text: str, env: Env) -> list[Task]:
     """
     This function also replaces generic function calls with calls to the concrete functions
     """
@@ -160,6 +198,27 @@ def get_tasks(text: str, env: Env) -> list[Task]:
     ]
 
 
+def get_high_order_tasks(text: str, env: Env) -> list[Task]:
+    tasks: set[Task] = set()
+    high_order_fn_call_pattern = r"(\w+)(<.+>)?\((.*fn.+)\);"
+
+    matches = re.finditer(high_order_fn_call_pattern, text, flags=re.MULTILINE)
+
+    for match in matches:
+        fn_name, optional_params, args = match.groups()
+        functions_as_args: list[str] = [f.replace("fn ", "").strip() for f in args.split(",") if "fn " in f]
+
+        tasks.add(Task(fn_name, [], env, functions_as_args))
+
+    return list(tasks)
+
+
+def get_tasks(text: str, env: Env) -> list[Task]:
+    l1: list[Task] = get_generic_tasks(text, env)
+    l2: list[Task] = get_high_order_tasks(text, env)
+    return l1 + l2
+
+
 def remove_generic_fn_text(input_text: str) -> str:
     """
     Returns the updated input text with the generic function declarations removed
@@ -182,6 +241,40 @@ def remove_generic_fn_text(input_text: str) -> str:
         input_text = input_text[:start] + replacement_text + input_text[end:]
 
     return input_text
+
+
+def remove_high_order_fn_text(input_text: str) -> str:
+    """
+    Returns the updated input text with the high order function declarations removed
+    """
+    pattern = regex.FUNCTION_AS_ARG_REGEX
+
+    replacements = []
+
+    matches = re.finditer(pattern, input_text, flags=re.MULTILINE)
+
+    for match in matches:
+        _, fn_name, _, _, _, _ = match.groups()
+        replacement_text = f"\n\n// Place concrete instances of the {fn_name} function here"
+        replacements.append((match.start(), match.end(), replacement_text))
+
+    # Sort the replacements in reverse order to ensure that replacing text doesn't affect other replacements
+    replacements.sort(reverse=True)
+
+    for start, end, replacement_text in replacements:
+        input_text = input_text[:start] + replacement_text + input_text[end:]
+
+    return input_text
+
+
+def remove_functions_from_text(text: str) -> str:
+    # Remove generic functions
+    text = remove_generic_fn_text(text)
+
+    # Remove functions that take other functions as args
+    text = remove_high_order_fn_text(text)
+
+    return text
 
 
 def replace_generic_calls_with_concrete(text: str, env: Env) -> str:
@@ -220,6 +313,36 @@ def replace_generic_calls_with_concrete(text: str, env: Env) -> str:
     return re.sub(pattern, replace_fn, text)
 
 
+def replace_high_order_function_calls(text: str) -> str:
+    high_order_fn_call_pattern = r"(\w+)(<.+>)?\((.*fn.+)\);"
+
+    matches = re.finditer(high_order_fn_call_pattern, text, flags=re.MULTILINE)
+
+    for match in matches:
+        fn_name, optional_params, args = match.groups()
+        functions_as_args: list[str] = [f.replace("fn ", "").strip() for f in args.split(",") if "fn " in f]
+        new_args: list[str] = [arg.strip() for arg in args.split(",") if "fn " not in arg]
+
+        replacement: str = ""
+        if optional_params is not None:
+            raise NotImplementedError
+        else:
+            replacement = f"{fn_name}_" + "_".join(functions_as_args) + "(" + ", ".join(new_args) + ");"
+
+        text = text[: match.start()] + replacement + text[match.end() :]
+    return text
+
+
+def replace_function_calls(text: str, env: Env) -> str:
+    # Replace calls to generic functions
+    text = replace_generic_calls_with_concrete(text, env)
+
+    # Replace calls to generic functions
+    text = replace_high_order_function_calls(text)
+
+    return text
+
+
 def replace_parameters_in_string(text: str, replacement_dict: dict[str, int]) -> str:
     """_
     Auxiliary function to replace the parameters with their value
@@ -243,7 +366,11 @@ def build_concrete_fn(
     Returns:
         str: The concrete function as a string.
     """
-    tmp = replace_parameters_in_string("_".join(generic_fn.params), replacement_dict)
+
+    if generic_fn.functions_as_args is not None:
+        tmp = replace_parameters_in_string("_".join(generic_fn.params + generic_fn.functions_as_args), replacement_dict)
+    else:
+        tmp = replace_parameters_in_string("_".join(generic_fn.params), replacement_dict)
 
     if generic_fn.annotation == "":
         res = f"fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
@@ -325,7 +452,7 @@ def validate_tasks(tasks: list[Task]):
     for task in tasks:
         if not task.is_valid():
             sys.stderr.write(f"Invalid task: {task}\n")
-            sys.exit(1)
+            sys.exit(-1)
 
 
 def replace_eval_global_params(text: str, params: dict[str, int]) -> str:

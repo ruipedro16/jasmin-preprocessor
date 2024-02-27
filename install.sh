@@ -21,6 +21,6 @@ else
 fi
 
 chmod +x preprocessor # Make sure the script is executable
-cp {preprocessor,env.py,generic_fn.py,task.py,utils.py} "$destination"
+cp {preprocessor,env.py,generic_fn.py,regex.py,task.py,utils.py} "$destination"
 
 cp jpp "$destination"

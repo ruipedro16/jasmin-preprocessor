@@ -23,18 +23,26 @@ class Task:
         env (Env): The environment
     """
 
-    def __init__(self, fn_name: str, template_params: list[int], env: Env):
+    def __init__(self, fn_name: str, template_params: list[int], env: Env, functions_as_args: list[str] = None):
         self.fn_name: str = fn_name  # Name of the generic function. Not the name of the resolved function I think (?)
         self.template_params: list[int] = template_params
         self.env: Env = env
+        self.functions_as_args: list[str] = functions_as_args if functions_as_args is not None else []
 
     def __repr__(self) -> str:
         template_params_buf: StringIO = StringIO()
         pprint.pprint(self.template_params, stream=template_params_buf)
         template_params_str: str = template_params_buf.getvalue()
 
+        high_order_functions_buf: StringIO = StringIO()
+        pprint.pprint(self.functions_as_args, stream=high_order_functions_buf)
+        high_order_functions_str: str = high_order_functions_buf.getvalue()
+
         return (
-            f"Function name: {self.fn_name}" f"Template parameters: {template_params_str}" f"Environment: {self.env}",
+            "Task:\n"
+            f"Function name: {self.fn_name}\n"
+            f"Template parameters: {template_params_str}"
+            f"High Order Functions: {high_order_functions_str}"
         )
 
     def get_resolved_fn_name(self) -> str:
@@ -56,10 +64,6 @@ class Task:
         # Convert the list to a tuple for hashing (TypeError: unhashable type: 'list')
         return hash((self.fn_name, tuple(self.template_params)))
 
-    def __repr__(self) -> str:
-        params_str = ", ".join(str(param) for param in self.template_params)
-        return f"Task(fn_name='{self.fn_name}', params=[{params_str}])"
-
     def is_valid(self) -> bool:
         return self.fn_name != ""
 
@@ -77,6 +81,10 @@ class Task:
             sys.exit(-1)
 
         replacement_dict: dict[str, int] = dict(zip(generic_fn.params, self.template_params))
+
+        if generic_fn.functions_as_args is not None:
+            functions_as_args_dict: dict[str, int] = dict(zip(generic_fn.functions_as_args, self.functions_as_args))
+            replacement_dict.update(functions_as_args_dict)
 
         # print(f"DEBUG: Printing replacement DICT of task {self.fn_name}")
         # pprint.pprint(replacement_dict)

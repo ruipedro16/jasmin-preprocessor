@@ -100,18 +100,18 @@ def resolve_templates(
     env.global_params.update(tmp)
 
     # 2nd step: Update generic functions dict from Jasmin source code
-    tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
+    tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)  # Also includes higher order functions
     env.generic_functions.update(tmp)
 
     # 3rd step: Remove the code of the generic functions from the source code
-    text = utils.remove_generic_fn_text(text)
+    text = utils.remove_functions_from_text(text)
 
     if args.after_rm_generic:
         print(text)
         sys.exit(0)
 
     # 4th step: Replace calls to generic functions with calls to concrete functions
-    text = utils.replace_generic_calls_with_concrete(text, env)
+    text = utils.replace_function_calls(text, env)
 
     # 5th step: Get a list of all the tasks that need to be done
     # First, we gather the tasks without handling nested calls, and then, after all
@@ -218,7 +218,8 @@ if __name__ == "__main__":
 
         # Replace usize
         output_text = output_text.replace(
-            "usize", "u64" if args.arch == "x86-64" else "u32" if args.arch == "arm-m4" else output_text
+            "usize",
+            "u64" if args.arch == "x86-64" else "u32" if args.arch == "arm-m4" else output_text,
         )
 
         # Replace casts
