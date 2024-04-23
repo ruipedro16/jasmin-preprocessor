@@ -1,14 +1,13 @@
-import pprint
-import sys
 import re
-
-from typing import Optional
+import sys
 
 import utils
-from env import Env
 from generic_fn import GenericFn
+from typed_generic_fn import TypedGenericFn
 
-from io import StringIO
+from typing import cast, Optional
+
+import pprint
 
 
 class Task:
@@ -18,98 +17,140 @@ class Task:
 
     Attributes:
         fn_name (str): The name of the function to be resolved in the Jasmin code.
-        template_params (list[str]): A list of the value of the parameters to be used in the function. At this point, the
-                                     value is already evaluated. E.g. 42 instead of INLEN
-        env (Env): The environment
+        template_params (list[str]): A list of the value of the parameters to be used in the function.
+        global_params (dict[str, int]): The dictionary of the global parameters
     """
 
-    def __init__(self, fn_name: str, template_params: list[int], env: Env, functions_as_args: list[str] = None):
-        self.fn_name: str = fn_name  # Name of the generic function. Not the name of the resolved function I think (?)
-        self.template_params: list[int] = template_params
-        self.env: Env = env
-        self.functions_as_args: list[str] = functions_as_args if functions_as_args is not None else []
+    def __init__(
+        self,
+        fn_name: str,
+        template_params: list[str | int],
+        global_params: dict[str, int],
+        # unless specified otherwise, a task is considered to be a simple
+        # generic function (i.e. not typed)
+        typed_fn_names: list[str] | None = None,
+        # TODO: from typing import Optional
+        typed_fn_types: list[str] | None = None,
+    ):
+        self.fn_name = fn_name
+        self.template_params = template_params
+        self.global_params = global_params
 
-    def __repr__(self) -> str:
-        template_params_buf: StringIO = StringIO()
-        pprint.pprint(self.template_params, stream=template_params_buf)
-        template_params_str: str = template_params_buf.getvalue()
+        if isinstance(typed_fn_names, str):
+            self.typed_fn_names = utils.string_to_singleton_list(typed_fn_names)
+        else:
+            self.typed_fn_names = typed_fn_names
 
-        high_order_functions_buf: StringIO = StringIO()
-        pprint.pprint(self.functions_as_args, stream=high_order_functions_buf)
-        high_order_functions_str: str = high_order_functions_buf.getvalue()
+        if isinstance(typed_fn_types, str):
+            self.typed_fn_types = utils.string_to_singleton_list(typed_fn_types)
+        else:
+            self.typed_fn_types = typed_fn_types
 
-        return (
-            "Task:\n"
-            f"Function name: {self.fn_name}\n"
-            f"Template parameters: {template_params_str}"
-            f"High Order Functions: {high_order_functions_str}"
-        )
-
-    def get_resolved_fn_name(self) -> str:
-        template_params_str: list[str] = [str(param) for param in self.template_params]
-        return f"{self.fn_name}_" + "_".join(template_params_str)
+        self.is_typed_task: bool = typed_fn_names is not None and typed_fn_types is not None
 
     def __eq__(self, other: object):
         if not isinstance(other, Task):
             return False
 
         template_params_int_self: list[int] = [int(val) for val in self.template_params]
-        template_params_int_other: list[int] = [
-            int(val) for val in other.template_params  # TODO: This cast to int shouldnt be necessary
-        ]
+        template_params_int_other: list[int] = [int(val) for val in other.template_params]
 
-        return self.fn_name == other.fn_name and template_params_int_self == template_params_int_other
+        if self.is_typed_task and other.is_typed_task:
+            return (
+                self.fn_name == other.fn_name
+                and template_params_int_self == template_params_int_other
+                and self.typed_fn_names == other.typed_fn_names
+                and self.typed_fn_types == other.typed_fn_types
+            )
+        elif (not self.is_typed_task) and (not other.is_typed_task):
+            return (
+                self.fn_name == other.fn_name
+                and template_params_int_self == template_params_int_other
+            )
+        else:
+            return False
 
     def __hash__(self):
-        # Convert the list to a tuple for hashing (TypeError: unhashable type: 'list')
+        # Convert the list to a tuple for hashing (TypeError: unhashable type:
+        # 'list')
         return hash((self.fn_name, tuple(self.template_params)))
+
+    def __repr__(self) -> str:
+        params_str = ", ".join(str(param) for param in self.template_params)
+        return f"Task(fn_name='{self.fn_name}', params=[{params_str}], typed_fn_names={self.typed_fn_names}, typed_fn_types={self.typed_fn_types}, typed_task={self.is_typed_task})"
 
     def is_valid(self) -> bool:
         return self.fn_name != ""
 
-    def resolve(self, text: str, env: Env) -> str:
+    def resolve(
+        self,
+        text: str,
+        generic_fn_dict: dict[str, GenericFn],
+        typed_generic_fn_dict: dict[str, TypedGenericFn],
+    ) -> str:
         """
         Resolve the function and return the concrete definition
         """
         pattern = rf"// Place concrete instances of the {self.fn_name} function here"
 
-        generic_fn: Optional[GenericFn] = None
+        generic_fn: GenericFn | TypedGenericFn = None
         try:
-            generic_fn = env.generic_functions[self.fn_name]
+            generic_fn = generic_fn_dict[self.fn_name]
         except KeyError:
-            sys.stderr.write(f"Could not find {self.fn_name} in env.generic_functions in Task.resolve [1]\n")
-            sys.exit(-1)
+            try:
+                generic_fn = typed_generic_fn_dict[self.fn_name]
+            except KeyError:
+                sys.stderr.write(
+                    f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve [1]\n"
+                )
+                sys.exit(-1)
 
         replacement_dict: dict[str, int] = dict(zip(generic_fn.params, self.template_params))
 
-        if generic_fn.functions_as_args is not None:
-            functions_as_args_dict: dict[str, int] = dict(zip(generic_fn.functions_as_args, self.functions_as_args))
-            replacement_dict.update(functions_as_args_dict)
+        if self.is_typed_task:
+            # suppress pytype warning
+            generic_fn = cast(TypedGenericFn, generic_fn)
+            tmp = dict(zip(generic_fn.generic_fn_names, self.typed_fn_names))
+            tm2 = dict(zip(generic_fn.generic_fn_types, self.typed_fn_types))
+            replacement_dict = {**replacement_dict, **tmp, **tm2}
 
         # print(f"DEBUG: Printing replacement DICT of task {self.fn_name}")
         # pprint.pprint(replacement_dict)
 
         return re.sub(
             pattern,
-            lambda match: match.group() + "\n" + utils.build_concrete_fn(generic_fn, replacement_dict) + "\n",
+            lambda match: match.group()
+            + "\n"
+            + utils.build_concrete_fn(generic_fn, replacement_dict, self.is_typed_task)
+            + "\n",
             text,
         )
 
+    # pytype: disable=name-error
     def get_sub_tasks(
         self,
-        env: Env,
-        context_params: Optional[dict[str, int]] = None,  # None in the first iteration
+        generic_fn_dict: dict[str, GenericFn],
+        typed_generic_fn_dict: dict[str, TypedGenericFn],
+        context_params: Optional[dict[str, int]] = None,
     ) -> list["Task"]:
+        # pytype: enable=name-error
         """
         Get the sub-tasks for the current task by resolving nested generic function calls.
         """
-        subtasks: list["Task"] = []
+        subtasks: list[Task] = []
 
-        generic_fn: Optional[GenericFn] = None
+        # print(f'\n\nDebug in Get Sub Task for task {self.fn_name}')
+        # print("Context params at the beginning")
+        # print(context_params)
+        # print("Generic_Fn_Dict")
+        # pprint.pprint(generic_fn_dict.keys())
+        # print("Typed_Generic_Fn_Dict")
+        # pprint.pprint(typed_generic_fn_dict.keys())
 
-        # TODO: FIXME: PEercebi 0 deste if
+        generic_fn: GenericFn | TypedGenericFn = None
+
         function_name = self.fn_name
-        if context_params is not None:  # If we are not in the first iteration
+        if context_params is not None:
             try:
                 function_name = eval(self.fn_name, {}, context_params)
                 print(f"Name: {function_name}")
@@ -117,94 +158,152 @@ class Task:
                 pass
 
         try:
-            generic_fn = env.generic_functions[function_name]
+            generic_fn = generic_fn_dict[function_name]
         except KeyError:
-            sys.stderr.write(f"Could not find {self.fn_name} in generic_fn_dict in Task.get_sub_tasks [2]\n")
-            sys.exit(-1)
+            try:
+                generic_fn = typed_generic_fn_dict[function_name]
+            except KeyError:
+                sys.stderr.write(
+                    f"Could not find {self.fn_name} in generic_fn_dict/typed_generic_fn_dict in Task.get_sub_tasks [2]\n"
+                )
+                sys.exit(-1)
 
-        resolved_fn_body: str = self.resolve(generic_fn.fn_body, env)
+        resolved_fn_body: str = self.resolve(
+            generic_fn.fn_body, generic_fn_dict, typed_generic_fn_dict
+        )
 
         # The 1st function call does not have
         if context_params is None:
             context_params = dict(zip(generic_fn.params, self.template_params))
 
-            # FIXME: I think these next 2 lines are not needed
+            if self.is_typed_task:
+                t = dict(zip(generic_fn.generic_fn_types, self.typed_fn_types))
+                u = dict(zip(generic_fn.generic_fn_names, self.typed_fn_names))
+                context_params.update(t)
+                context_params.update(u)
+        else:
             tmp = dict(zip(generic_fn.params, self.template_params))
             context_params.update(tmp)
 
-        # Find nested generic function calls
+        # 'Simple' generic fn
         generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
         for match in re.finditer(generic_fn_call_pattern, resolved_fn_body):
             fn_name, generic_params, _ = match.groups()
 
-            # If the function already exists, we don't generate it
-            # This is to support recursive functions. The base case is written in "standard jasmin"
-            # and the inductive case is written in "high level jasmin"
-            # if fn_name in env.functions:
-            #    continue  # Skip to the next iteration
-            """
-            if fn_name == self.target_fn_name:
+            if fn_name == self.fn_name:
                 sys.stderr.write(f"Recursive functions not supported: {self.fn_name}\n")
                 sys.exit(-1)
-            """
 
-            generic_params: list[str] = [p.strip() for p in generic_params.split(",")]
+            generic_params = [p.strip() for p in generic_params.split(",")]
 
             for param in generic_params:
-                # If the parameter exists, we recompute it regardless.
-                # This is stupid but we need it to support recursive functions
-                try:
-                    _ = context_params.pop(param)
-                except KeyError:
-                    pass
-
                 try:
                     # Context params may override global params
-                    context_params[param] = int(context_params[param])  # Nao percebi
+                    context_params[param] = int(context_params[param])
                 except KeyError:
                     try:
-                        # get param from context_params else the default value is env.global_params[param]
-                        context_params[param] = context_params.get(param, env.global_params[param])
+                        context_params[param] = context_params.get(param, self.global_params[param])
                     except KeyError:
                         template_params_int: list[int] = [int(val) for val in self.template_params]
-
                         template_dict: dict[str, int] = dict(
                             zip(
-                                env.generic_functions[self.fn_name].params,
+                                generic_fn_dict[self.fn_name].params,
                                 template_params_int,
                             )
                         )  # TODO: handle key error
-
                         context_params[param] = eval(
                             param.replace("/", "//"),
                             {},
                             {
-                                **env.global_params,
+                                **self.global_params,
                                 **context_params,
                                 **template_dict,
                             },
                         )
-
                     except Exception:
-                        sys.stderr.write(f"Could not evaluate parameter: {param}\n")
+                        sys.stderr.write("Could not evaluate parameter: {param}")
 
             concrete_args: list[int] = [int(context_params.get(p, p)) for p in generic_params]
-
-            subtask = Task(fn_name, concrete_args, env)
+            subtask = Task(fn_name, concrete_args, self.global_params)
             subtasks.append(subtask)
 
-        # Recursive step: Find and collect sub-tasks from the resolved function body
-        replacement_dict: dict[str, int] = dict(zip(generic_fn.params, self.template_params))
+        # 'Typed' generic fn
+        typed_generic_fn_call_pattern = r"(\w+)<([^>]+)>\s*\[([^\]]+)]\(([^)]+)\);"
+        for match in re.finditer(typed_generic_fn_call_pattern, resolved_fn_body):
+            fn_name, generic_params, type_info, _ = match.groups()
+            fn_names = type_info.split(";")[0]
+            if isinstance(fn_names, str):
+                fn_names: list[str] = utils.string_to_singleton_list(fn_names)
+            fn_names = [v.strip() for v in fn_names]
 
-        # Recursive functions: Check if any subtask corresponds to a base case already defined in "standard" jasmin.
-        # If so, we remove that task
-        subtasks = [subtask for subtask in subtasks if subtask.get_resolved_fn_name() not in env.functions]
+            fn_types = type_info.split(";")[-1]
+            if isinstance(fn_types, str):
+                fn_types: list[str] = utils.string_to_singleton_list(fn_types)
+            fn_types = [v.strip() for v in fn_types]
+
+            if fn_name == self.fn_name:
+                sys.stderr.write(f"Recursive functions not supported: {self.fn_name}\n")
+                sys.exit(-1)
+
+            generic_params: list[str] = [p.strip() for p in generic_params.split(",")]
+
+            for param in generic_params:
+                try:
+                    # Context params may override global params
+                    context_params[param] = int(context_params[param])
+                except KeyError:
+                    try:
+                        context_params[param] = context_params.get(param, self.global_params[param])
+                    except KeyError:
+                        template_params_int: list[int] = [int(val) for val in self.template_params]
+                        template_dict: dict[str, int] = dict(
+                            zip(
+                                generic_fn_dict[self.fn_name].params,
+                                template_params_int,
+                            )
+                        )  # TODO: handle key error
+                        context_params[param] = eval(
+                            param.replace("/", "//"),
+                            {},
+                            {
+                                **self.global_params,
+                                **context_params,
+                                **template_dict,
+                            },
+                        )
+                    except Exception:
+                        sys.stderr.write("Could not evaluate parameter: {param}")
+
+            concrete_args = [int(context_params.get(p, p)) for p in generic_params]
+
+            fn_names: list[str] = [name for name in fn_names if name != ""]
+            print(f"Debug: evaluating fn_names: {fn_names}")
+
+            fn_types: list[str] = [type for type in fn_types if type != ""]
+            print(f"Debug: evaluating fn_types: {fn_types}")
+
+            fn_names: list[str] = utils.eval_list(fn_names, context_params)
+            fn_types: list[str] = utils.eval_list(fn_types, context_params)
+
+            subtask = Task(fn_name, concrete_args, self.global_params, fn_names, fn_types)
+            subtasks.append(subtask)
+
+        # Recursive step: Find and collect sub-tasks from the resolved function
+        # body
+        replacement_dict: dict[str, int] = dict(zip(generic_fn.params, self.template_params))
+        if self.is_typed_task:
+            # suppress pytype warning
+            generic_fn = cast(TypedGenericFn, generic_fn)
+            tmp = dict(zip(generic_fn.generic_fn_names, self.typed_fn_names))
+            tm2 = dict(zip(generic_fn.generic_fn_types, self.typed_fn_types))
+            replacement_dict = {**replacement_dict, **tmp, **tm2}
 
         for subtask in subtasks:
             sub_subtasks = subtask.get_sub_tasks(
-                env,
+                generic_fn_dict,
+                typed_generic_fn_dict,
                 {
-                    **env.global_params,
+                    **self.global_params,
                     **context_params,
                     **replacement_dict,
                 },  # Pass resolved_params_local in the recursion
