@@ -1,100 +1,28 @@
 import re
 import sys
 
-from generic_fn import GenericFn
-from task import Task
-from typed_generic_fn import TypedGenericFn
-
-from itertools import chain
-from typing import cast, Any, TypeVar
-
 import multiprocessing
 import concurrent.futures
 
+from itertools import chain
+from typing import Any
 
-def flatten(input_list: list[list[Any]]) -> list[Any]:
-    return list(chain(*input_list))
+from generic_fn import GenericFn
+from task import Task
+from env import Env
 
+import regex
 
-T = TypeVar("T", str, int)
+word_sizes: list[str] = ["u8", "u16", "u32", "u64", "u128", "u256"]
 
-
-def eval_list(input_list: list[T], eval_dict: dict[str, int]) -> list[T]:
-    res = []
-    for v in input_list:
-        try:
-            evaluated_value = eval(v, {}, eval_dict)
-        except NameError:
-            # If an exception is raised during evaluation, keep the original
-            # value
-            evaluated_value = v
-        res.append(evaluated_value)
-    return res
-
-
-def string_to_singleton_list(input_string: str) -> list[str]:
-    return [input_string]
-
-
-def remove_duplicates(input_list: list[Any]) -> list[Any]:
-    """
-    Removes duplicates from a list and returns a new list with unique elements.
-
-    Args:
-        input_list (list[T]): The input list with potential duplicates.
-
-    Returns:
-        list[T]: A new list with duplicates removed.
-    """
-    if len(input_list) == 0:
-        return input_list
-
-    if not hasattr(input_list[0].__class__, "__eq__"):
-        raise TypeError("Elements in the input list must implement the __eq__ method.")
-
-    res = []
-
-    for item in input_list:
-        if item not in res:
-            res.append(item)
-
-    return res
-
-
-def replace_eval_global_params(text: str, params: dict[str, int]) -> str:
-    def eval_expression(match):
-        name, expression = match.groups()
-        try:
-            value = eval(expression.replace("/", "//"), params)
-            return f"param int {name} = {value};"
-        except Exception as e:
-            print(f"Error evaluating expression for {name}: {e}")
-            return match.group(0)
-
-    pattern = r"param\s+int\s+(\w+)\s*=\s*(.+);"
-    updated_text = re.sub(pattern, eval_expression, text)
-    return updated_text
-
-
-def parse_tasks(text: list[str], global_params: dict[str, int]) -> list[Task]:
-    if text is None:
-        return []
-
-    res: list[Task] = []
-    for s in text:
-        fields: list[str] = s.split()
-        params: dict[str, int] = {}
-        fn_name: str = fields[0].split(":")[-1]
-        for field in fields:
-            if field.startswith("p:"):
-                # Split the field by ':'
-                _, key, value = field.split(":")
-                params[key] = int(value)
-
-        task = Task(fn_name, list(params.values()), global_params)
-        res.append(task)
-
-    return res
+cast_replacement_dict: dict[str, str] = {
+    "!(u8)": "(8u)",
+    "!(u16)": "(16u)",
+    "!(u32)": "(32u)",
+    "!(u64)": "(64u)",
+    "!(u128)": "(128u)",
+    "!(u256)": "(256u)",
+}
 
 
 def get_params(code: str) -> dict[str, int]:
@@ -131,9 +59,7 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
     """
     res: dict[str, GenericFn] = {}
 
-    pattern = r"([#\[\]\"=\w]+)?\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
-
-    if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
+    if matches := re.finditer(regex.GENERIC_FUNCTION_REGEX, input_text, flags=re.MULTILINE):
         for match in matches:
             annotation, fn_name, params, args, fn_body = match.groups()
 
@@ -151,54 +77,152 @@ def get_generic_fn_dict(input_text: str) -> dict[str, GenericFn]:
             generic_fn = GenericFn(annotation, fn_name, params, args, fn_body)
             res[fn_name] = generic_fn
 
-    return res
-
-
-def get_typed_generic_fn_dict(input_text: str) -> dict[str, TypedGenericFn]:
-    """
-    Same as get_generic_fn_dict but for TypedGenericFn
-    """
-    res: dict[str, TypedGenericFn] = {}
-
-    pattern = r"([#\[\]\"=\w]+)?\s+?fn\s+(\w+)<([^>]+)>\s*\[([^\]]+)]\s*\(([^\)]+)\)([\s\S]*?)}//<>"
-
-    if matches := re.finditer(pattern, input_text, flags=re.MULTILINE):
+    if matches := re.finditer(regex.FUNCTION_AS_ARG_REGEX, input_text, flags=re.MULTILINE):
         for match in matches:
-            (
-                annotation,
-                fn_name,
-                params,
-                typed_params,
-                args,
-                fn_body,
-            ) = match.groups()
-            typed_fn_names: list[str] = typed_params.split(";")[0].split(",")
-            typed_fn_type: list[str] = [t.strip() for t in typed_params.split(";")[-1].split(",")]
+            annotation, fn_name, _, params, args, fn_body = match.groups()
 
-            annotation = annotation.strip()
-            if "#" in annotation:
+            annotation = annotation.strip() if annotation is not None else annotation
+            if annotation is not None and "#" in annotation:
                 annotation += "\n"
 
-            typed_generic_fn = TypedGenericFn(
-                annotation,
-                fn_name,
-                params,
-                args,
-                fn_body,
-                typed_fn_names,
-                typed_fn_type,
-            )
-            res[fn_name] = typed_generic_fn
+            # arguments without the functions
+            new_args = ",".join(filter(lambda s: "fn" not in s, args.split(","))).strip()
+
+            functions: list[str] = []
+            functions_str: list[str] = [s.strip() for s in args.split(",") if "fn" in s]
+
+            for function_str in functions_str:
+                if match := re.search(r"fn (\w+)", function_str):
+                    arg_fn_name = match.group(1)
+                    functions.append(arg_fn_name)
+
+            generic_fn = GenericFn(annotation, fn_name, params, new_args, fn_body, functions)
+            res[fn_name] = generic_fn
 
     return res
+
+
+def get_functions_from_source(code: str) -> list[str]:
+    pattern = regex.FUNCTION_REGEX
+    matches = re.findall(pattern, code, re.MULTILINE)
+
+    return [match[1] for match in matches if not (match[0].strip().startswith("export") or "fn" in match[2].strip())]
+
+
+def get_high_order_functions_from_source(code: str) -> list[str]:
+    pattern = regex.FUNCTION_REGEX
+    matches = re.findall(pattern, code, re.MULTILINE)
+
+    l1 = [
+        match[1] for match in matches if not (match[0].strip().startswith("export") and "fn" in match[2].strip())
+    ]  # Functions that dont have <>
+
+    # TODO:
+    l2 = []  # Functions that have <>
+
+    return l1 + l2
+
+
+def get_global_vars(code: str) -> dict[str, int]:
+    """
+    Same as get_params but for global variables.
+    """
+    # TODO: Should global arrays be supported ?
+    res: dict[str, int] = {}
+
+    # raise NotImplementedError
+
+    return res
+
+
+def parse_tasks(text: list[str], env: Env) -> list[Task]:
+    if text is None:
+        return []
+
+    pattern = r"fn:[^ ]+\s+(\s*p:[^ ]+:\d+)+"
+
+    res: list[Task] = []
+    for s in text:
+        if not re.match(pattern, s):
+            sys.stderr.write("Invalid format for task\n")
+            sys.stderr.write("Format should be fn:<function name> p:<parameter name>:parameter value\n")
+            sys.stderr.write("Example: fn:shake256  p:OUTLEN:64 p:INLEN:64")
+            sys.exit(-1)
+
+        fields: list[str] = s.split()
+        params: dict[str, int] = {}
+        fn_name: str = fields[0].split(":")[-1]
+        for field in fields:
+            if field.startswith("p:"):
+                # Split the field by ':'
+                _, key, value = field.split(":")
+                params[key] = int(value)
+
+        task: Task = Task(fn_name, list(params.values()), env)
+        res.append(task)
+
+    return res
+
+
+def get_generic_tasks(text: str, env: Env) -> list[Task]:
+    """
+    This function also replaces generic function calls with calls to the concrete functions
+    """
+    tasks = set()
+    generic_fn_call_pattern = r"(\w+)<(.+)>\(([^)]+)\);"
+
+    def replace_fn(match) -> str:
+        fn_name, generic_params, generic_args = match.groups()
+        generic_params: list[str] = [p.strip() for p in generic_params.split(",")]
+        concrete_params = {}
+
+        for param in generic_params:
+            try:
+                # Evaluate the expression using the param_dict to get the
+                # concrete value
+                concrete_params[param] = eval(param.replace("/", "//"), None, env.global_params)
+            except (NameError, TypeError, ValueError, SyntaxError):
+                # If evaluation fails, use the original param as a string
+                concrete_params[param] = param
+
+        concrete_args = [str(concrete_params.get(p, p)) for p in generic_params]
+        # Store the task with all parameters
+        tasks.add((fn_name, tuple(concrete_args)))
+        return f"{fn_name}_" + "_".join(concrete_args) + f"({generic_args})"
+
+    text = re.sub(generic_fn_call_pattern, replace_fn, text)
+    return [  # We only return the tasks that can be solved right away. We look for subtasks later
+        Task(fn_name, list(params), env)
+        for fn_name, params in tasks
+        if all(param.isdigit() or param in word_sizes for param in params)
+    ]
+
+
+def get_high_order_tasks(text: str, env: Env) -> list[Task]:
+    tasks: set[Task] = set()
+    high_order_fn_call_pattern = r"(\w+)(<.+>)?\((.*fn.+)\);"
+
+    matches = re.finditer(high_order_fn_call_pattern, text, flags=re.MULTILINE)
+
+    for match in matches:
+        fn_name, optional_params, args = match.groups()
+        functions_as_args: list[str] = [f.replace("fn ", "").strip() for f in args.split(",") if "fn " in f]
+
+        tasks.add(Task(fn_name, [], env, functions_as_args))
+
+    return list(tasks)
+
+
+def get_tasks(text: str, env: Env) -> list[Task]:
+    l1: list[Task] = get_generic_tasks(text, env)
+    l2: list[Task] = get_high_order_tasks(text, env)
+    return l1 + l2
 
 
 def remove_generic_fn_text(input_text: str) -> str:
     """
     Returns the updated input text with the generic function declarations removed
     """
-    res: dict[str, GenericFn] = {}
-
     pattern = r"^([#\[\]\"=\w\s]*)\s+?fn\s+(\w+)<([^>]+)>\s*\(([^\)]+)\)([\s\S]*?)}//<>"
 
     matches = re.finditer(pattern, input_text, flags=re.MULTILINE)
@@ -210,8 +234,7 @@ def remove_generic_fn_text(input_text: str) -> str:
         replacement_text = f"\n\n// Place concrete instances of the {fn_name} function here"
         replacements.append((match.start(), match.end(), replacement_text))
 
-    # Sort the replacements in reverse order to ensure that replacing text
-    # doesn't affect other replacements
+    # Sort the replacements in reverse order to ensure that replacing text doesn't affect other replacements
     replacements.sort(reverse=True)
 
     for start, end, replacement_text in replacements:
@@ -220,25 +243,22 @@ def remove_generic_fn_text(input_text: str) -> str:
     return input_text
 
 
-def remove_typed_generic_fn_text(input_text: str) -> str:
+def remove_high_order_fn_text(input_text: str) -> str:
     """
-    Returns the updated input text with the typed  generic function declarations removed
+    Returns the updated input text with the high order function declarations removed
     """
-    res: dict[str, GenericFn] = {}
-
-    pattern = r"([#\[\]\"=\w]+)?\s+?fn\s+(\w+)<([^>]+)>\s*\[([^\]]+)]\s*\(([^\)]+)\)([\s\S]*?)}//<>"
-
-    matches = re.finditer(pattern, input_text, flags=re.MULTILINE)
+    pattern = regex.FUNCTION_AS_ARG_REGEX
 
     replacements = []
+
+    matches = re.finditer(pattern, input_text, flags=re.MULTILINE)
 
     for match in matches:
         _, fn_name, _, _, _, _ = match.groups()
         replacement_text = f"\n\n// Place concrete instances of the {fn_name} function here"
         replacements.append((match.start(), match.end(), replacement_text))
 
-    # Sort the replacements in reverse order to ensure that replacing text
-    # doesn't affect other replacements
+    # Sort the replacements in reverse order to ensure that replacing text doesn't affect other replacements
     replacements.sort(reverse=True)
 
     for start, end, replacement_text in replacements:
@@ -247,7 +267,17 @@ def remove_typed_generic_fn_text(input_text: str) -> str:
     return input_text
 
 
-def replace_generic_calls_with_concrete(text: str, global_params: dict[str, int]) -> str:
+def remove_functions_from_text(text: str) -> str:
+    # Remove generic functions
+    text = remove_generic_fn_text(text)
+
+    # Remove functions that take other functions as args
+    text = remove_high_order_fn_text(text)
+
+    return text
+
+
+def replace_generic_calls_with_concrete(text: str, env: Env) -> str:
     """
     Replaces generic function calls with concrete function calls based on the provided parameters.
 
@@ -255,6 +285,9 @@ def replace_generic_calls_with_concrete(text: str, global_params: dict[str, int]
     type parameters, e.g., 'my_function<T, U>(x, y)'. It also takes a dictionary 'global_params'
     containing concrete values for the generic type parameters. The function then replaces
     the calls to generic functions with the corresponding calls to concrete functions.
+
+    For example, f = foo<2>(...) { ... } becomes f = foo_2(...) { ... } and
+                 x = bar<2, 3>(...) { ... } becomes x = bar_2_3(...) { ... }
     """
 
     def replace_fn(match):
@@ -266,7 +299,7 @@ def replace_generic_calls_with_concrete(text: str, global_params: dict[str, int]
             try:
                 # Evaluate the expression using the global_params dict to get
                 # the concrete value
-                concrete_params[param] = eval(param.replace("/", "//"), None, global_params)
+                concrete_params[param] = eval(param.replace("/", "//"), None, env.global_params)
             except (NameError, TypeError, ValueError, SyntaxError):
                 # If evaluation fails, use the original param as a string
                 concrete_params[param] = param
@@ -280,84 +313,34 @@ def replace_generic_calls_with_concrete(text: str, global_params: dict[str, int]
     return re.sub(pattern, replace_fn, text)
 
 
-def replace_typed_generic_calls_with_concrete(text: str, global_params: dict[str, int]) -> str:
-    """
-    Same as replace_generic_calls_with_concrete but for typed generic functions
-    """
+def replace_high_order_function_calls(text: str) -> str:
+    high_order_fn_call_pattern = r"(\w+)(<.+>)?\((.*fn.+)\);"
 
-    def replace_fn(match):
-        fn_name, generic_params, t = match.groups()
-        generic_params = [p.strip() for p in generic_params.split(",")]
-        concrete_params: dict[str, int] = {}
+    matches = re.finditer(high_order_fn_call_pattern, text, flags=re.MULTILINE)
 
-        for param in generic_params:
-            try:
-                # Evaluate the expression using the global_params dict to get
-                # the concrete value
-                concrete_params[param] = eval(param.replace("/", "//"), None, global_params)
-            except (NameError, TypeError, ValueError, SyntaxError):
-                # If evaluation fails, use the original param as a string
-                concrete_params[param] = param
+    for match in matches:
+        fn_name, optional_params, args = match.groups()
+        functions_as_args: list[str] = [f.replace("fn ", "").strip() for f in args.split(",") if "fn " in f]
+        new_args: list[str] = [arg.strip() for arg in args.split(",") if "fn " not in arg]
 
-        concrete_args = [str(concrete_params.get(p, p)) for p in generic_params]
+        replacement: str = ""
+        if optional_params is not None:
+            raise NotImplementedError
+        else:
+            replacement = f"{fn_name}_" + "_".join(functions_as_args) + "(" + ", ".join(new_args) + ");"
 
-        typed_fn_names = t.split(";")[0].strip()
-        typed_fn_types = t.split(";")[-1].strip()
-
-        if "," in typed_fn_types:
-            typed_fn_types = [t.strip() for t in typed_fn_types.split(",")]
-
-        if isinstance(typed_fn_names, str):
-            typed_fn_names = string_to_singleton_list(typed_fn_names)
-        if isinstance(typed_fn_types, str):
-            typed_fn_types = string_to_singleton_list(typed_fn_types)
-
-        typed_fn_types_str: str = "_".join(typed_fn_types)
-        typed_fn_names_str: str = "_".join(typed_fn_names)
-        concrete_call = f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}_" + "_".join(
-            concrete_args
-        )
-
-        return concrete_call
-
-    pattern = r"(\w+)<([^>]+)>\[*\[([^\]]+)]"
-    text = re.sub(pattern, replace_fn, text)
-
+        text = text[: match.start()] + replacement + text[match.end() :]
     return text
 
 
-def get_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
-    """
-    This function also replaces generic function calls with calls to the concrete functions
-    """
-    tasks = set()
-    generic_fn_call_pattern = r"(\w+)<([^>]+)>\(([^)]+)\);"
+def replace_function_calls(text: str, env: Env) -> str:
+    # Replace calls to generic functions
+    text = replace_generic_calls_with_concrete(text, env)
 
-    def replace_fn(match) -> str:
-        fn_name, generic_params, generic_args = match.groups()
-        generic_params: list[str] = [p.strip() for p in generic_params.split(",")]
-        concrete_params = {}
+    # Replace calls to generic functions
+    text = replace_high_order_function_calls(text)
 
-        for param in generic_params:
-            try:
-                # Evaluate the expression using the param_dict to get the
-                # concrete value
-                concrete_params[param] = eval(param.replace("/", "//"), None, global_params)
-            except (NameError, TypeError, ValueError, SyntaxError):
-                # If evaluation fails, use the original param as a string
-                concrete_params[param] = param
-
-        concrete_args = [str(concrete_params.get(p, p)) for p in generic_params]
-        # Store the task with all parameters
-        tasks.add((fn_name, tuple(concrete_args)))
-        return f"{fn_name}_" + "_".join(concrete_args) + f"({generic_args})"
-
-    text = re.sub(generic_fn_call_pattern, replace_fn, text)
-    return [  # We only return the tasks that can be solved right away. We look for subtasks later
-        Task(fn_name, list(params), global_params)
-        for fn_name, params in tasks
-        if all(param.isdigit() for param in params)
-    ]
+    return text
 
 
 def replace_parameters_in_string(text: str, replacement_dict: dict[str, int]) -> str:
@@ -370,42 +353,24 @@ def replace_parameters_in_string(text: str, replacement_dict: dict[str, int]) ->
 
 
 def build_concrete_fn(
-    generic_fn: GenericFn | TypedGenericFn,
+    generic_fn: GenericFn,
     replacement_dict: dict[str, int],
-    is_typed_task: bool,
 ) -> str:
     """
     Build the concrete function from the generic one.
 
     Args:
-        generic_fn (GenericFn | TypedGenericFn): Information about the generic function.
+        generic_fn (GenericFn): Information about the generic function.
         replacement_dict (dict[str, int]): Map containing the value of each parameter to replace in the function.
-        is_typed_task (bool): Boolean flag indicating whether the task is typed.
 
     Returns:
         str: The concrete function as a string.
     """
-    tmp = ""
-    if not is_typed_task:  # Simple generic function
-        generic_fn = cast(GenericFn, generic_fn)  # suppress pytype warning
+
+    if generic_fn.functions_as_args is not None:
+        tmp = replace_parameters_in_string("_".join(generic_fn.params + generic_fn.functions_as_args), replacement_dict)
+    else:
         tmp = replace_parameters_in_string("_".join(generic_fn.params), replacement_dict)
-    else:  # Typed Generic function
-        # suppress pytype warning
-        generic_fn = cast(TypedGenericFn, generic_fn)
-
-        print("Handling typed task")
-
-        tmp = replace_parameters_in_string(
-            "_".join(generic_fn.generic_fn_names)
-            + "_"
-            + "_".join(generic_fn.generic_fn_types)
-            + "_"
-            + "_".join(generic_fn.params),
-            replacement_dict,
-        )
-
-    if generic_fn.annotation is None:
-        generic_fn.annotation = ""
 
     if generic_fn.annotation == "":
         res = f"fn {generic_fn.fn_name}_{tmp}({replace_parameters_in_string(generic_fn.args, replacement_dict)})"
@@ -419,64 +384,93 @@ def build_concrete_fn(
     return res
 
 
-def get_typed_fn_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
+def flatten(input_list: list[list[Any]]) -> list[Any]:
+    return list(chain(*input_list))
+
+
+def find_subtasks(task: Task, env: Env) -> list[Task]:
+    return task.get_sub_tasks(env)
+
+
+def find_sub_taks_concurrenly(tasks: list[Task], env: Env) -> list[Task]:
+    try:
+        workers: int = multiprocessing.cpu_count()
+    except NotImplementedError:
+        workers: int = 1
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        # Submit tasks to the executor concurrently
+        futures = [executor.submit(find_subtasks, task, env) for task in tasks]
+
+        # Wait for all tasks to complete
+        concurrent.futures.wait(futures)
+
+        # Get results from the completed tasks
+        subtasks: list[list[Task]] = [future.result() for future in futures]
+
+    # new_tasks: list[Task] = [subtask for sublist in subtasks for subtask in sublist]
+    new_tasks: list[Task] = flatten(subtasks)
+
+    tasks.extend(new_tasks)
+    return tasks
+
+
+def find_sub_tasks_sequentially(tasks: list[Task], env: Env) -> list[Task]:
+    new_tasks: list[Task] = []
+    for task in tasks:
+        new_tasks.extend(task.get_sub_tasks(env))
+    tasks.extend(new_tasks)
+    return tasks
+
+
+def remove_duplicates(input_list: list[Any]) -> list[Any]:
     """
-    Same as get_tasks but for typed generic functions
+    Removes duplicates from a list and returns a new list with unique elements.
+
+    Args:
+        input_list (list[T]): The input list with potential duplicates.
+
+    Returns:
+        list[T]: A new list with duplicates removed.
     """
-    tasks = set()
-    generic_fn_call_pattern = r"(\w+)<([^>]+)>\[*\[([^\]]+)]\(([^)]+)\);"
+    if len(input_list) == 0:
+        return input_list
 
-    def replace_fn(match) -> str:
-        fn_name, generic_params, typed_fn_info, generic_args = match.groups()
-        generic_params = [p.strip() for p in generic_params.split(",")]
+    if not hasattr(input_list[0].__class__, "__eq__"):
+        raise TypeError("Elements in the input list must implement the __eq__ method.")
 
-        typed_fn_names = [name.strip() for name in typed_fn_info.split(";")[0].split(",")]
-        typed_fn_names = tuple([name for name in typed_fn_names if name != ""])
+    res = []
 
-        typed_fn_types = [t.strip() for t in typed_fn_info.split(";")[-1].split(",")]
-        typed_fn_types = tuple(
-            [type for type in typed_fn_types if type != ""]
-        )  # because a list is not hashable
+    for item in input_list:
+        if item not in res:
+            res.append(item)
 
-        concrete_params = {}
-
-        # print('Debug in get tasks')
-        # print(typed_fn_names)
-        # print(typed_fn_types)
-
-        for param in generic_params:
-            try:
-                # Evaluate the expression using the param_dict to get the
-                # concrete value
-                concrete_params[param] = eval(param.replace("/", "//"), None, global_params)
-            except (NameError, TypeError, ValueError, SyntaxError):
-                # If evaluation fails, use the original param as a string
-                concrete_params[param] = param
-
-        concrete_args = [str(concrete_params.get(p, p)) for p in generic_params]
-        tasks.add(
-            (fn_name, tuple(concrete_args), typed_fn_names, typed_fn_types)
-        )  # Store the task with all parameters
-
-        # TODO: FIXME: Update to handle multiple typed fn names
-        typed_fn_names_str: str = "_".join(typed_fn_names)
-        typed_fn_types_str: str = "_".join(typed_fn_types)
-        return (
-            f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}"
-            + "_".join(concrete_args)
-            + f"({generic_args})"
-        )
-
-    text = re.sub(generic_fn_call_pattern, replace_fn, text)
-
-    return [  # We only return the tasks that can be solved right away. We look for subtasks later
-        Task(fn_name, list(params), global_params, typed_fn_names, typed_fn_types)
-        for fn_name, params, typed_fn_names, typed_fn_types in tasks
-        if all(param.isdigit() for param in params)
-    ]
+    return res
 
 
-def resolve_generic_fn_calls(text: str, global_params: dict[str, int]) -> str:
+def validate_tasks(tasks: list[Task]):
+    for task in tasks:
+        if not task.is_valid():
+            sys.stderr.write(f"Invalid task: {task}\n")
+            sys.exit(-1)
+
+
+def replace_eval_global_params(text: str, params: dict[str, int]) -> str:
+    def eval_expression(match):
+        name, expression = match.groups()
+        try:
+            value = eval(expression.replace("/", "//"), params)
+            return f"param int {name} = {value};"
+        except Exception as e:
+            print(f"Error evaluating expression for {name}: {e}")
+            return match.group(0)
+
+    pattern = r"param\s+int\s+(\w+)\s*=\s*(.+);"
+    updated_text = re.sub(pattern, eval_expression, text)
+    return updated_text
+
+
+def resolve_generic_fn_calls(text: str, env: Env) -> str:
     if text is None:
         return ""
 
@@ -504,82 +498,14 @@ def resolve_generic_fn_calls(text: str, global_params: dict[str, int]) -> str:
     # Regular generic fn
     text = re.sub(
         r"(\w+)<(.+)>",
-        lambda match: f"{match.group(1)}_{'_'.join(str(global_params.get(p.strip(), eval(p.strip().replace('/', '//'), {}, global_params))) for p in match.group(2).split(','))}",
+        lambda match: f"{match.group(1)}_{'_'.join(str(env.global_params.get(p.strip(), eval(p.strip().replace('/', '//'), {}, env.global_params))) for p in match.group(2).split(','))}",
         text,
     )
 
     return text
 
 
-def replace_expand_macros(text: str) -> str:
-    """
-    Only performs find-replace
-    """
-
-    pattern = r"#expand\s+(\S+)\s+([^\/\/\n]+)"
-    matches = dict(re.findall(pattern, text, re.MULTILINE))
-
-    # Remove #expand from the jasmin source code
-    text = re.sub(pattern, "", text)
-
-    for key, value in matches.items():
-        text = text.replace(f"{key}", str(value))
-
+def replace_casts(text: str) -> str:
+    for key, value in cast_replacement_dict.items():
+        text = text.replace(f"{key}", value)
     return text
-
-
-def validate_tasks(tasks: list[Task]):
-    for task in tasks:
-        if not task.is_valid():
-            sys.stderr.write(f"Invalid task: {task}\n")
-            sys.exit(1)
-
-
-def find_subtasks(
-    task: Task,
-    generic_fn_dict: dict[str, GenericFn],
-    typed_generic_fn_dict: dict[str, TypedGenericFn],
-) -> list[Task]:
-    return task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict)
-
-
-def find_sub_taks_concurrenly(
-    tasks: list[Task],
-    generic_fn_dict: dict[str, GenericFn],
-    typed_generic_fn_dict: dict[str, TypedGenericFn],
-) -> list[Task]:
-    try:
-        workers: int = multiprocessing.cpu_count()
-    except NotImplementedError:
-        workers: int = 1
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-        # Submit tasks to the executor concurrently
-        futures = [
-            executor.submit(find_subtasks, task, generic_fn_dict, typed_generic_fn_dict)
-            for task in tasks
-        ]
-
-        # Wait for all tasks to complete
-        concurrent.futures.wait(futures)
-
-        # Get results from the completed tasks
-        subtasks: list[list[Task]] = [future.result() for future in futures]
-
-    # new_tasks: list[Task] = [subtask for sublist in subtasks for subtask in sublist]
-    new_tasks: list[Task] = flatten(subtasks)
-
-    tasks.extend(new_tasks)
-    return tasks
-
-
-def find_sub_tasks_sequentially(
-    tasks: list[Task],
-    generic_fn_dict: dict[str, GenericFn],
-    typed_generic_fn_dict: dict[str, TypedGenericFn],
-) -> list[Task]:
-    new_tasks: list[Task] = []
-    for task in tasks:
-        new_tasks.extend(task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict))
-    tasks.extend(new_tasks)
-    return tasks
