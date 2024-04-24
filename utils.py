@@ -314,9 +314,7 @@ def replace_typed_generic_calls_with_concrete(text: str, global_params: dict[str
 
         typed_fn_types_str: str = "_".join(typed_fn_types)
         typed_fn_names_str: str = "_".join(typed_fn_names)
-        concrete_call = f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}_" + "_".join(
-            concrete_args
-        )
+        concrete_call = f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}_" + "_".join(concrete_args)
 
         return concrete_call
 
@@ -434,9 +432,7 @@ def get_typed_fn_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
         typed_fn_names = tuple([name for name in typed_fn_names if name != ""])
 
         typed_fn_types = [t.strip() for t in typed_fn_info.split(";")[-1].split(",")]
-        typed_fn_types = tuple(
-            [type for type in typed_fn_types if type != ""]
-        )  # because a list is not hashable
+        typed_fn_types = tuple([type for type in typed_fn_types if type != ""])  # because a list is not hashable
 
         concrete_params = {}
 
@@ -454,18 +450,12 @@ def get_typed_fn_tasks(text: str, global_params: dict[str, int]) -> list[Task]:
                 concrete_params[param] = param
 
         concrete_args = [str(concrete_params.get(p, p)) for p in generic_params]
-        tasks.add(
-            (fn_name, tuple(concrete_args), typed_fn_names, typed_fn_types)
-        )  # Store the task with all parameters
+        tasks.add((fn_name, tuple(concrete_args), typed_fn_names, typed_fn_types))  # Store the task with all parameters
 
         # TODO: FIXME: Update to handle multiple typed fn names
         typed_fn_names_str: str = "_".join(typed_fn_names)
         typed_fn_types_str: str = "_".join(typed_fn_types)
-        return (
-            f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}"
-            + "_".join(concrete_args)
-            + f"({generic_args})"
-        )
+        return f"{fn_name}_{typed_fn_names_str}_{typed_fn_types_str}" + "_".join(concrete_args) + f"({generic_args})"
 
     text = re.sub(generic_fn_call_pattern, replace_fn, text)
 
@@ -555,10 +545,7 @@ def find_sub_taks_concurrenly(
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
         # Submit tasks to the executor concurrently
-        futures = [
-            executor.submit(find_subtasks, task, generic_fn_dict, typed_generic_fn_dict)
-            for task in tasks
-        ]
+        futures = [executor.submit(find_subtasks, task, generic_fn_dict, typed_generic_fn_dict) for task in tasks]
 
         # Wait for all tasks to complete
         concurrent.futures.wait(futures)
@@ -583,3 +570,68 @@ def find_sub_tasks_sequentially(
         new_tasks.extend(task.get_sub_tasks(generic_fn_dict, typed_generic_fn_dict))
     tasks.extend(new_tasks)
     return tasks
+
+
+def list_to_tupple_str(x) -> str:
+    if len(x) == 1:
+        return f"{x[0]}"
+    else:
+        return f'({",".join(map(str, x))})'
+
+
+def taks_to_json(generic_fn_dict: dict[str, GenericFn], tasks: list[Task]):
+    """
+    schema:
+        {
+                        "fn" : "__sha256_"
+                        "template parameters": ['OUTLEN', 'INLEN'],
+                        "parameters" : {
+                            [64, 64],
+                            [128, 128]
+                        },
+                        "resolved fn": ["__sha256_64_64", "__sha256_128_128"]
+                    }
+                }
+            ]
+        }
+    """
+    dict = {}
+    functions: list[str] = list(set([task.fn_name for task in tasks]))
+
+    for function in functions:
+        template_parameters = generic_fn_dict[function].params
+        # print(template_parameters)
+        dict[function] = {"template parameters": template_parameters, "parameters": ""}
+
+    for task in tasks:
+        args = task.template_params
+        function = task.fn_name
+        # print(str(list_to_tupple_str(args)))
+        x = dict[function]["parameters"]
+        if x == "":
+            x += str(list_to_tupple_str(args))
+        else:
+            x += f", {str(list_to_tupple_str(args))}"
+        dict[function]["parameters"] = x
+
+    # Add resolved fn field
+    for generic_fn_name in dict.keys():
+        parameters_str = dict[generic_fn_name]["parameters"]
+
+        if len(dict[generic_fn_name]["template parameters"]) == 1:  # one template parameter
+            parameters_list = parameters_str.split(",")
+            suffixes = [f"_{t.strip()}" for t in parameters_list]
+            resolved_fn_names = [f"{generic_fn_name}{s}" for s in suffixes]
+            dict[generic_fn_name]["resolved fn"] = ", ".join(resolved_fn_names)
+        elif len(dict[generic_fn_name]["template parameters"]) == 2:  # two template parameters
+            parameters_list = parameters_str.replace("(", "").replace(")", "").split(",")
+            int_tuples = [
+                (int(parameters_list[i]), int(parameters_list[i + 1].strip()))
+                for i in range(0, len(parameters_list), 2)
+            ]
+            resolved_fn_names = [f"{generic_fn_name}_{t[0]}_{t[1]}" for t in int_tuples]
+            dict[generic_fn_name]["resolved fn"] = ", ".join(resolved_fn_names)
+        else:
+            raise NotImplementedError("taks_to_json is only implemented for functions with 1 or 2 template parameters")
+
+    return dict

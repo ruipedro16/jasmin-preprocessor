@@ -26,12 +26,15 @@ from generic_fn import GenericFn
 from task import Task
 from typed_generic_fn import TypedGenericFn
 
+import json
+
 
 def parse_args() -> Namespace:
     """Parse CLI arguments"""
     parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
 
     parser.add_argument(
+        "-in",
         "--input_file",
         required=True,
         help="Input file path",
@@ -39,6 +42,7 @@ def parse_args() -> Namespace:
     )
 
     parser.add_argument(
+        "-out",
         "--output_file",
         required=False,
         help="Output file path",
@@ -83,6 +87,12 @@ def parse_args() -> Namespace:
         help="Number of worker threads for finding subtask concurrently",
         type=int,
         required=False,
+    )
+
+    parser.add_argument(
+        "--print_tasks",
+        help="Print tasks in JSON format",
+        action="store_true",  # Makes -d a flag without an argument
     )
 
     return parser.parse_args()
@@ -136,9 +146,7 @@ def resolve_templates(
     # This needs to be done on the input_text instead of the already processed
     # text
     tasks: list[Task] = (
-        export_tasks
-        + utils.get_tasks(input_text, global_params)
-        + utils.get_typed_fn_tasks(input_text, global_params)
+        export_tasks + utils.get_tasks(input_text, global_params) + utils.get_typed_fn_tasks(input_text, global_params)
     )
 
     if args.debug:
@@ -166,6 +174,12 @@ def resolve_templates(
         print("Tasks [3rd pass (removes duplicate tasks)]:")
         pprint.pprint(tasks)
         print("\n", end="")
+
+    if args.print_tasks:
+        tasks_json = utils.taks_to_json(generic_fn_dict, tasks)
+        json_string: str = json.dumps(tasks_json)
+        print(json_string)
+        sys.exit(0)
 
     # See if there is any invalid task
     utils.validate_tasks(tasks)
@@ -254,9 +268,7 @@ if __name__ == "__main__":
             print(input_text)
             sys.exit(0)
 
-        output_text: str = resolve_templates(
-            input_text, global_params, generic_fn_dict, typed_generic_fn_dict, args
-        )
+        output_text: str = resolve_templates(input_text, global_params, generic_fn_dict, typed_generic_fn_dict, args)
         output_text += "\n"
 
         output_text = utils.replace_eval_global_params(output_text, global_params)

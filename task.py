@@ -63,10 +63,7 @@ class Task:
                 and self.typed_fn_types == other.typed_fn_types
             )
         elif (not self.is_typed_task) and (not other.is_typed_task):
-            return (
-                self.fn_name == other.fn_name
-                and template_params_int_self == template_params_int_other
-            )
+            return self.fn_name == other.fn_name and template_params_int_self == template_params_int_other
         else:
             return False
 
@@ -100,9 +97,7 @@ class Task:
             try:
                 generic_fn = typed_generic_fn_dict[self.fn_name]
             except KeyError:
-                sys.stderr.write(
-                    f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve [1]\n"
-                )
+                sys.stderr.write(f"Could not find {self.fn_name} in generic_fn_dict in Task.resolve [1]\n")
                 sys.exit(-1)
 
         replacement_dict: dict[str, int] = dict(zip(generic_fn.params, self.template_params))
@@ -168,9 +163,7 @@ class Task:
                 )
                 sys.exit(-1)
 
-        resolved_fn_body: str = self.resolve(
-            generic_fn.fn_body, generic_fn_dict, typed_generic_fn_dict
-        )
+        resolved_fn_body: str = self.resolve(generic_fn.fn_body, generic_fn_dict, typed_generic_fn_dict)
 
         # The 1st function call does not have
         if context_params is None:
