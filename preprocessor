@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+
+"""
+$ python3 preprocessor [-d] --input_file <input_file>
+                            --output_file <output_file>
+                            --task <task to generate the export function>
+
+E.g.
+
+python3 preprocessor --input_file test_shake256_32_64.jpp
+                     --output_file test_shake256_32_64.jpp
+                     --task "fn:shake256 p:OUTLEN:32 p:INLEN:64"
+"""
+
 
 import os
 import re
@@ -10,9 +22,11 @@ import argparse
 from argparse import Namespace
 
 import utils
-from env import Env
 from generic_fn import GenericFn
 from task import Task
+from typed_generic_fn import TypedGenericFn
+
+import json
 
 
 def parse_args() -> Namespace:
@@ -20,28 +34,19 @@ def parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description="Jasmin source code preprocessor")
 
     parser.add_argument(
-        "--input_file",
         "-in",
+        "--input_file",
         required=True,
         help="Input file path",
         type=str,
     )
 
     parser.add_argument(
-        "--output_file",
         "-out",
+        "--output_file",
         required=False,
         help="Output file path",
         type=str,
-    )
-
-    parser.add_argument(
-        "--arch",
-        required=False,
-        type=str,
-        default="x86-64",
-        choices=["x86-64", "arm-m4"],
-        help="Target architecture (default is x86-64)",
     )
 
     parser.add_argument(
@@ -84,41 +89,65 @@ def parse_args() -> Namespace:
         required=False,
     )
 
+    parser.add_argument(
+        "--print_tasks",
+        help="Print tasks in JSON format",
+        action="store_true",  # Makes -d a flag without an argument
+    )
+
     return parser.parse_args()
 
 
 def resolve_templates(
     text: str,
-    env: Env,
+    global_params: dict[str, int],
+    generic_fn_dict: dict[str, GenericFn],
+    typed_generic_fn_dict: dict[str, TypedGenericFn],
     args: Namespace,
 ) -> str:
-    # TODO: FIXME: I dont remember why we need these firrst two steps
+    """
+    Resolves templates in the source code.
+    The code assumes that all template declarations follow the format:
+    '[inline/#[returnaddress="stack"]]
+    fn <function_name><template_params>(<parameters>) -> <return_type> { <function_body> } //<>'
+    """
+
+    # pylint: disable=redefined-outer-name
 
     # 1st step: Update global params dict. The source file may define new
     # `param int` variables or override previously defined ones
     tmp: dict[str, int] = utils.get_params(text)
-    env.global_params.update(tmp)
+    global_params.update(tmp)
 
     # 2nd step: Update generic functions dict from Jasmin source code
-    tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)  # Also includes higher order functions
-    env.generic_functions.update(tmp)
+    tmp: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
+    generic_fn_dict.update(tmp)
+
+    # 2.5 step: Update generic functions dict from Jasmin source code
+    tmp: dict[str, TypedGenericFn] = utils.get_typed_generic_fn_dict(text)
+    typed_generic_fn_dict.update(tmp)
 
     # 3rd step: Remove the code of the generic functions from the source code
-    text = utils.remove_functions_from_text(text)
+    text = utils.remove_typed_generic_fn_text(text)
+    text = utils.remove_generic_fn_text(text)
 
     if args.after_rm_generic:
         print(text)
         sys.exit(0)
 
-    # 4th step: Replace calls to generic functions with calls to concrete functions
-    text = utils.replace_function_calls(text, env)
+    # 4th step: Replace calls to generic functions with calls to concrete
+    # functions
+    text = utils.replace_typed_generic_calls_with_concrete(text, global_params)
+    text = utils.replace_generic_calls_with_concrete(text, global_params)
 
     # 5th step: Get a list of all the tasks that need to be done
     # First, we gather the tasks without handling nested calls, and then, after all
     # the tasks are collected, resolve the nested calls in the Task class.
     # This needs to be done on the input_text instead of the already processed
     # text
-    tasks: list[Task] = export_tasks + utils.get_tasks(input_text, env)
+    tasks: list[Task] = (
+        export_tasks + utils.get_tasks(input_text, global_params) + utils.get_typed_fn_tasks(input_text, global_params)
+    )
 
     if args.debug:
         print("Tasks [1st pass]:")
@@ -129,16 +158,16 @@ def resolve_templates(
         print(f"# Workers: {args.workers}")
 
     if args.workers:
-        tasks: list["Task"] = utils.find_sub_tasks_sequentially(tasks, env)
+        tasks = utils.find_sub_tasks_sequentially(tasks, generic_fn_dict, typed_generic_fn_dict)
     else:
-        tasks: list["Task"] = utils.find_sub_tasks_sequentially(tasks, env)
+        tasks = utils.find_sub_tasks_sequentially(tasks, generic_fn_dict, typed_generic_fn_dict)
 
     if args.debug:
         print("Tasks [2nd pass (includes subtasks)]:")
         pprint.pprint(tasks)
         print("\n", end="")
 
-        # Remove duplicate tasks
+    # Remove duplicate tasks
     tasks = utils.remove_duplicates(tasks)
 
     if args.debug:
@@ -146,19 +175,25 @@ def resolve_templates(
         pprint.pprint(tasks)
         print("\n", end="")
 
+    if args.print_tasks:
+        tasks_json = utils.taks_to_json(generic_fn_dict, tasks)
+        json_string: str = json.dumps(tasks_json)
+        print(json_string)
+        sys.exit(0)
+
     # See if there is any invalid task
     utils.validate_tasks(tasks)
 
     # 6th step: Resolve each task
     for task in tasks:
-        text = task.resolve(text, env)
+        text = task.resolve(text, generic_fn_dict, typed_generic_fn_dict)
 
     if args.after_tasks:
         print(text)
         sys.exit(0)
 
     # 7th step: Resolve generic function calls that were not resolved before
-    text = utils.resolve_generic_fn_calls(text, env)
+    text = utils.resolve_generic_fn_calls(text, global_params)
 
     if args.after_generic_fn_calls:
         print(text)
@@ -172,20 +207,17 @@ def resolve_templates(
     while re.search(pattern, text):
         text = re.sub(pattern, "\n\n", text)
 
-    return text.strip() + "\n"
+    text = text.strip()
+
+    return text
 
 
 if __name__ == "__main__":
-    # TODO: I don't remember why we need python > 3.10 (maybe bc of the type annotations)
-    if sys.version_info < (3, 10):
-        sys.stderr.write("Python 3.10 or higher is required\n")
-        sys.exit(-1)
-
     try:
         args: Namespace = parse_args()
 
         if args.debug:
-            print(f"Command Line Task (args.task): {args.task}")
+            print(f"Args.task: {args.task}")
 
         # Check if the input files exists
         if not os.path.exists(args.input_file):
@@ -195,35 +227,51 @@ if __name__ == "__main__":
         with open(args.input_file, "r", encoding="utf-8") as f:
             text: str = f.read()
 
-        # 1st step: Create the global environment
-        env: Env = Env(text)
+        # 1st step: Load global parameters from param files
+        global_params: dict[str, int] = utils.get_params(text)
 
         if args.debug:
-            print(f"Environment: {env}")
+            print("DEBUG: Global Param Dictionary")
+            pprint.pprint(global_params)
+            print("\n")
 
-        export_tasks: list[Task] = utils.parse_tasks(args.task, env)
+        if args.debug:
+            print("Text after macro replacement")
+            print(text, end="\n\n")
+
+        # 2nd step: Get generic functions dict from Jasmin source code
+        generic_fn_dict: dict[str, GenericFn] = utils.get_generic_fn_dict(text)
+
+        # 2.5 step: Get typed generic functions dict from Jasmin source code
+        typed_generic_fn_dict: dict[str, TypedGenericFn] = utils.get_typed_generic_fn_dict(text)
+
+        export_tasks: list[Task] = utils.parse_tasks(args.task, global_params)
 
         if args.debug:
             print("DEBUG: Export tasks: ")
             pprint.pprint(export_tasks)
             print("\n")
 
-        # TODO: I dont remember why we need to read twice
+        if args.debug:
+            print("DEBUG: Generic Fn Dictionary:")
+            pprint.pprint(sorted(generic_fn_dict.keys()))
+            print("\n")
+            print("DEBUG: Typed Generic Fn Dictionary:")
+            pprint.pprint(sorted(typed_generic_fn_dict.keys()))
+            print("\n")
+
         with open(args.input_file, "r", encoding="utf-8") as f:
             input_text: str = f.read()
 
-        output_text: str = resolve_templates(input_text, env, args)
+        input_text = utils.replace_expand_macros(input_text)
+        if args.after_macro:
+            print(input_text)
+            sys.exit(0)
 
-        output_text = utils.replace_eval_global_params(output_text, env.global_params)
+        output_text: str = resolve_templates(input_text, global_params, generic_fn_dict, typed_generic_fn_dict, args)
+        output_text += "\n"
 
-        # Replace usize
-        output_text = output_text.replace(
-            "usize",
-            "u64" if args.arch == "x86-64" else "u32" if args.arch == "arm-m4" else output_text,
-        )
-
-        # Replace casts
-        output_text = utils.replace_casts(output_text)
+        output_text = utils.replace_eval_global_params(output_text, global_params)
 
         if args.debug:
             print("\n--------------------------------------------------------------\n")
@@ -233,6 +281,5 @@ if __name__ == "__main__":
                 f.write(output_text)
         else:
             print(output_text)
-
     except KeyboardInterrupt:
         sys.stderr.write("Program interrupted (Ctrl+C)\n")

@@ -12,6 +12,7 @@ Run:
 - `--after_tasks`: Prints the program after resolving the tasks
 - `--after_generic_fn_calls`: Prints the program after resolving generic function calls
 - `--workers`: Defines the number of worker threads for finding subtask concurrently
+- `--print_tasks`: Prints tasks in JSON format
 
 ## Run with Docker
 
